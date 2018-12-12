@@ -5,7 +5,7 @@ Betűjáték számos beállítási és táblaszerkesztési lehetőséggel, egysz
 
 
 
-# Teendők:
+## Teendők:
   - [ ] hibák javítása
   - [ ] használható dokumentáció
   - [ ] választható erősségű (szókincs korlátozása, vagy a legjobb szó pontértékének százalékában
