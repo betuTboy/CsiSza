@@ -3,8 +3,8 @@
 Betűjáték számos beállítási és táblaszerkesztési lehetőséggel, egyszemélyes
 és gépi játékos elleni játékkal, magyar nyelven.
 
-Gérard Swinnen Tanuljunk meg programozni Python nyelven című könyvének példaprogramjai szolgáltak
-kiindulási alapul. <mek.oszk.hu/08400/08435/08435.pdf> Sok ötlet, megoldás, programrészlet származik
+Gérard Swinnen Tanuljunk meg programozni Python nyelven című könyvének (mek.oszk.hu/08400/08435/08435.pdf)
+példaprogramjai szolgáltak kiindulási alapul. Sok ötlet, megoldás, programrészlet származik
 a stackoverflow.com oldalon található diskurzusokból.
 
 ## Teendők:
