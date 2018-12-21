@@ -3,6 +3,17 @@
 Betűjáték számos beállítási és táblaszerkesztési lehetőséggel, egyszemélyes
 és gépi játékos elleni játékkal, magyar nyelven.
 
+Saját szórakoztatásomra készítettem ezt a programot, de úgy gondolom, hogy mások számára is hasznos
+lehet. A GPLv3 licenc alapján használható, semmiféle garancia nincs a rendeltetésszerű működésére,
+és a készítője semmilyen felelősséget nem vállal a program használatából eredő esetleges károkért.
+
+Teljesen amatőrként, a Python nyelvvel éppen csak ismerkedve, elsősorban a betűjáték kategória kedvelőjeként
+fogtam hozzá. Mindenféle tervezés nélkül megszakításokkal több éven át készült. A menet közben felmerülő újabb
+és újabb ötletek, és a megvalósításuk útjában álló akadályok (pl. Python 2.7 -> Python 3.5) következtében egyes
+részek többször változtak, de vannak benne jócskán első verzióban, közel nulla nyelvismerettel írt részek is.
+Mindezeket csak mentegetőzésképpen írom, azt jelezve, hogy senki ne várjon egy kész, működőképes programot,
+jól olvasható, következetes kódot.
+
 Gérard Swinnen Tanuljunk meg programozni Python nyelven című könyvének (mek.oszk.hu/08400/08435/08435.pdf)
 példaprogramjai szolgáltak kiindulási alapul. Sok ötlet, megoldás, programrészlet származik
 a stackoverflow.com oldalon található diskurzusokból.
@@ -16,12 +27,6 @@ a stackoverflow.com oldalon található diskurzusokból.
   - [ ] GUI tökéletesítése
   - [ ] távoli játék
   - [ ] új funkciók
-
-
-Saját szórakoztatásomra készítettem ezt a programot, de úgy gondolom, hogy mások számára is hasznos
-lehet. A GPLv3 licensz alapján használható, semmiféle garancia nincs a rendeltetésszerű működésére,
-és a készítője semmilyen felelősséget nem vállal a program használatából eredő esetleges károkért.
-
 
 License
 
