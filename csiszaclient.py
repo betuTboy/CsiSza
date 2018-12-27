@@ -916,11 +916,20 @@ def start():
 
     def startserver():
         global servproc
-        servproc = subprocess.Popen(['python3', 'csiszaserver.py'])
+        try:
+            servproc = subprocess.Popen(["python3", "csiszaserver.py"])
+        except IOError:
+            servproc = subprocess.Popen(["python", "csiszaserver.py"])
 
     def startaiclient():
-        comm = "python3 csiszaaiclient.py " + str(options.aitimelimit) + " " + " ".join(options.wordlengthlist)
-        os.system(comm)
+        global aiclientprocl
+        try:
+            aiclientproc = subprocess.Popen("python3 ./csiszaaiclient.py " + str(options.aitimelimit) +
+                                            " " + " ".join(options.wordlengthlist), shell = True)
+        except IOError:
+            aiclientproc = subprocess.Popen("python ./csiszaaiclient.py " + str(options.aitimelimit) +
+                                            " " + " ".join(options.wordlengthlist), shell=True)
+        aiclientprocl.append(aiclientproc)
 
     if options.gamemode == 1:
         if not tkinter.messagebox.askokcancel("Játék újrakezdése",
@@ -1011,6 +1020,8 @@ def quit1():
     """Kilépés a programból"""
     global queue1
     global th_E
+    global servproc
+    global aiclientprocl
     if options.gamemode == 1:
         if not tkinter.messagebox.askokcancel("Kilépés", "Valóban el akarod hagyni a programot?"):
             return
@@ -1020,6 +1031,12 @@ def quit1():
         if not tkinter.messagebox.askokcancel("Kilépés", "Valóban el akarod hagyni a programot?"):
             return
         queue1.put("END")
+        subprocess.Popen.terminate(servproc)
+        for aiproc in aiclientprocl:
+            try:
+                subprocess.Popen.terminate(aiproc)
+            except OSError:
+                pass
         time.sleep(2)
         appwin.destroy()
         os._exit(1)
@@ -4670,6 +4687,7 @@ def pass1():
 def endofgame():
     """Eredmény kijelzése a játék végén"""
     global servproc
+    global aiclientprocl
     global timeractive
     unbind1()
     lockon()
@@ -4725,7 +4743,11 @@ def endofgame():
     var100.set(0)
     if options.gamemode == 2:
         subprocess.Popen.terminate(servproc)
-
+        for aiproc in aiclientprocl:
+            try:
+                subprocess.Popen.terminate(aiproc)
+            except OSError:
+                pass
 
 def drawsack():
     """Zsák rajzolása"""
@@ -5297,6 +5319,7 @@ def init1():
     global turns
     global th_E, th_R
     global servproc
+    global aiclientprocl
     global numberofplayers
     global options
     numberofplayers = 1
@@ -5338,6 +5361,7 @@ def init1():
     th_E = None
     th_R = None
     servproc = None
+    aiclientprocl = []
     config = configparser.ConfigParser()
     config.read_file(open(options.lastopenedcfg, encoding="utf8"))
     options.racksize = int(config.get('Rules', 'racksize'))
