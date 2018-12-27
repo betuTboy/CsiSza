@@ -917,19 +917,19 @@ def start():
     def startserver():
         global servproc
         try:
-            servproc = subprocess.Popen(["python3", "csiszaserver.py"])
+            servproc = subprocess.Popen([interpreter, "csiszaserver.py"])
         except IOError:
-            servproc = subprocess.Popen(["python", "csiszaserver.py"])
+            pass
 
     def startaiclient():
         global aiclientprocl
         try:
-            aiclientproc = subprocess.Popen("python3 ./csiszaaiclient.py " + str(options.aitimelimit) +
+            aiclientproc = subprocess.Popen(interpreter + " csiszaaiclient.py " + str(options.aitimelimit) +
                                             " " + " ".join(options.wordlengthlist), shell = True)
+            aiclientprocl.append(aiclientproc)
         except IOError:
-            aiclientproc = subprocess.Popen("python ./csiszaaiclient.py " + str(options.aitimelimit) +
-                                            " " + " ".join(options.wordlengthlist), shell=True)
-        aiclientprocl.append(aiclientproc)
+            pass
+
 
     if options.gamemode == 1:
         if not tkinter.messagebox.askokcancel("Játék újrakezdése",
@@ -5717,9 +5717,11 @@ if platform1 == "Windows":
     buttonwidth = 1
     defaultfont.configure(size=10)
     pad1 = 1
+    interpreter = "python"
 else:
     buttonwidth = 0
     pad1 = 0
+    interpreter = "python3"
 
 frame1 = Frame(appwin, bg='#d6d6d6')
 frame1.pack(side=RIGHT, fill=BOTH,)
