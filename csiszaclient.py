@@ -5033,10 +5033,11 @@ def next1():
     lettersontheboard()
 
 
-def loaddictionary(file):
+def loaddictionary():
     """Szótár betöltése"""
     global dictionary
     global partsofdictionary
+    file = "szotar20c_.dic"
     abc2 = ('A', 'Á', 'B', 'C', 'CS', 'D', 'E', 'É', 'F', 'G', 'GY', 'H', 'I', 'Í', 'J', 'K', 'L', 'LY', 'M', 'N', 'NY',
            'O', 'Ó', 'Ö', 'Ő', 'P', 'Q', 'R', 'S', 'SZ', 'T', 'TY', 'U', 'Ú', 'Ü', 'Ű', 'V', 'W', 'X', 'Y', 'Z', 'ZS')
     for letter1 in abc2:
@@ -5703,6 +5704,8 @@ def about1():
 
 options = csiszaoptions.Options()
 queue1 = queue.Queue()
+ld = threading.Thread(target=loaddictionary)
+ld.start()
 appwin = Tk()
 appwin.title("Csináld szavad")
 options.letterfont = tkinter.font.nametofont("TkDefaultFont").actual()
@@ -6016,7 +6019,7 @@ s.configure("blue.Vertical.TProgressbar", foreground="#0000ff", background="#000
 pb1 = Progressbar(canvas10b, style="green.Vertical.TProgressbar", orient="vertical", length=frame0.winfo_height(),
                   maximum=100, mode="determinate", variable=varpb1)
 
-loaddictionary("szotar20c_.dic")
 timerupdate()
 appwin.protocol("WM_DELETE_WINDOW", quit1)
 appwin.mainloop()
+
