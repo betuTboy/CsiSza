@@ -1,3 +1,11 @@
+# CsiSza v0.2
+
+## Változások:
+
+- A gépi ellenfelek külön-külön beállíthatóak. A szókészletük lehet teljes, kevesebb mint 40000 szó vagy kevesebb mint 20000 szó. Megadható az erősségük százalékban is. 
+- A betűkészletek szerkesztési lehetőségei kiegészültek új, beszúrás és törlés funkciókkal. 
+- Egyéb apró javítások.
+
 # CsiSza v0.1
 
 Betűjáték számos beállítási és táblaszerkesztési lehetőséggel, egyszemélyes
