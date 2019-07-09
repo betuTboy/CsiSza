@@ -931,12 +931,12 @@ def start():
         elif options.aidictionarylimited[i] == "40000 >":
             lim = "1"
         try:
+            # aiclientproc = subprocess.Popen("./csiszaaiclient " + str(options.aitimelimit[i]) +
+            #                                " " + lim + " " + str(options.aistrength[i]) + " " +
+            #                                " ".join(options.wordlengthlist[i]), shell=True)
             aiclientproc = subprocess.Popen(interpreter + " csiszaaiclient.py " + str(options.aitimelimit[i]) +
                                             " " + lim + " " + str(options.aistrength[i]) + " " +
                                             " ".join(options.wordlengthlist[i]), shell = True)
-            # aiclientproc = subprocess.Popen(["./csiszaaiclient ",  str(options.aitimelimit[i]),
-            #                                lim, str(options.aistrength[i]),
-            #                                " ".join(options.wordlengthlist)], shell=True)
             aiclientprocl.append(aiclientproc)
         except IOError:
             pass

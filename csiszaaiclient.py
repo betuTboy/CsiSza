@@ -564,7 +564,7 @@ def aimove1(partsofdictionary):
     for l in ailettersonbothrackl:
         ailettersonbothrack.append(l[0])
     allvalidword = []
-    aifields = [*board]
+    aifields = board[:]
     for i in range(fieldrc):
         for j in range(fieldcc):
             if fields[i][j].type1 != '*':
@@ -973,7 +973,7 @@ def compare1(partsofdictionary, firstletter, pattern1, ailettersonbothrack):
                         break
                 if not suit:
                     continue
-                ailettersonbothrackcopy = [*ailettersonbothrack]
+                ailettersonbothrackcopy = ailettersonbothrack[:]
                 if not firstletter:
                     try:
                         ailettersonbothrackcopy.remove(l)
