@@ -2233,7 +2233,7 @@ def validmove(lob, direction):
                     fob.append(rec)
                     rec = []
                     if options.startfield and firstmove:
-                        if i == options.startfieldy and j == options.startfieldx:
+                        if i == options.startfieldx and j == options.startfieldy:
                             onthestartfield = True
     if firstmove:
         if options.startfield and not onthestartfield:
@@ -3320,7 +3320,6 @@ def setup1(sow):
         def validate2():
             try:
                 int(var70a.get())
-                int(var41.get())
                 int(var42.get())
                 int(var43.get())
                 int(var44.get())
@@ -3338,7 +3337,7 @@ def setup1(sow):
         if not validate2():
             return
         int(var70a.get())
-        v11 = int(var41.get())
+        v11 = var41.get()
         v12 = int(var42.get())
         v13 = int(var43.get())
         int(var44.get())
@@ -3347,9 +3346,21 @@ def setup1(sow):
         int(var47.get())
         int(var48.get())
         int(var70.get())
-        if v11 < 1 or v11 > options.height:
+        if not v11.isalpha():
             tkinter.messagebox.showerror("Hibás kezdő mező pozíció",
-                                         "Nem lehet kisebb, mint 1, és nem lehet nagyobb,mint a tábla magassága",
+                                         "Csak nagybetűket fogad a beviteli mező",
+                                         parent=popup4)
+            return
+        try:
+            rowl = abc.index(v11)
+        except Exception:
+            tkinter.messagebox.showerror("Hibás kezdő mező pozíció",
+                                         "Csak nagybetűket fogad a beviteli mező",
+                                         parent=popup4)
+            return
+        if rowl > options.height:
+            tkinter.messagebox.showerror("Hibás kezdő mező pozíció",
+                                         "Csak A és " + rowl + " közé eshet",
                                          parent=popup4)
             return
         if v12 < 1 or v12 > options.width:
@@ -3361,8 +3372,8 @@ def setup1(sow):
             tkinter.messagebox.showerror("Hibás érték", "A körök száma nem lehet kisebb, mint 1", parent=popup4)
             return
         options.timelimit = int(var70a.get())
-        options.startfieldx = int(var41.get())
-        options.startfieldy = int(var42.get())
+        options.startfieldx = abc.index(var41.get().upper().strip())
+        options.startfieldy = int(var42.get())-1
         options.turnlimitcount = int(var43.get())
         options.useoldbonusvalue = int(var44.get())
         options.wordperturnbonusvalue = int(var45.get())
@@ -3370,7 +3381,7 @@ def setup1(sow):
         options.pointforeachletter = int(var47.get())
         options.ppointforeachletter = int(var48.get())
         options.aitimelimit[notebook1.index("current")] = int(var70.get())
-
+        print(options.startfieldx, options.startfieldy)
 
     var70a = StringVar()
     var70a.set(options.timelimit)
@@ -3428,7 +3439,7 @@ def setup1(sow):
     CreateToolTip(checkb3a, "Ha a táblán vannak előre beírt betűk, akkor ne legyen bejelölve")
 
     var41 = StringVar()
-    var41.set(options.startfieldx)
+    var41.set(abc[options.startfieldx])
     entry1 = Entry(f1, state=sow1, disabledforeground="gray50", width=2, bg="white", relief=SUNKEN, borderwidth=2,
                    textvariable=var41, justify="right")
     entry1.grid(row=6, column=3, sticky=E)
@@ -3437,7 +3448,7 @@ def setup1(sow):
     CreateToolTip(entry1, "Sor")
 
     var42 = StringVar()
-    var42.set(options.startfieldy)
+    var42.set(options.startfieldy+1)
     entry2 = Entry(f1, state=sow1, disabledforeground="gray50", width=2, bg="white", relief=SUNKEN, borderwidth=2,
                    textvariable=var42, justify="right")
     entry2.grid(row=6, column=4, sticky=E)
@@ -4127,7 +4138,7 @@ def letterset(header):
         for k in range(len(data)):
             for l7 in range(len(data[k])):
                 if l7 == 0 or l7 == 3:
-                    data[k][l7] = entries[k][l7].get().capitalize()
+                    data[k][l7] = entries[k][l7].get().upper()
                     if not (data[k][l7]).isalpha() and data[k][l7] != '*':
                         tkinter.messagebox.showerror("Hibás érték", "Csak betűket fogad a beviteli mező",
                                                      parent=popup7)
@@ -4406,7 +4417,7 @@ def createoreditboard(board1):
                 j += 1
             else:
                 button125.append('*')
-                button125[i] = Button(popup11, width=buttonwidth + 2, height=1, padx=1, pady=1, text=letter,
+                button125[i] = Button(popup11, width=buttonwidth+2, height=1, padx=1, pady=1, text=letter,
                                       command=lambda letter=letter: writeletter(letter, button, popup11, v11, w11))
                 button125[i].grid(row=i // 7, column=i % 7)
                 i += 1
@@ -4619,7 +4630,7 @@ def createoreditboard(board1):
             else:
                 text1 = ""
             buttons[v12][w12] = Button(frame500, bg=color11, relief=FLAT, text=text1, font=("Sans", 10),
-                                       width=buttonwidth, height=1, activebackground=color11)
+                                       width=buttonwidth+2, height=1, padx=1, pady=1, activebackground=color11)
             buttons[v12][w12].configure(command=lambda v12=v12, w12=w12, button=buttons[v12][w12]:
                                         changefield(v12, w12, button))
             buttons[v12][w12].grid(row=v12, column=w12)
