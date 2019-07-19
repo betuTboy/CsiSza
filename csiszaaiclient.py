@@ -979,7 +979,6 @@ def compare1(partsofdictionary, firstletter, pattern1, ailettersonbothrack):
                         ailettersonbothrackcopy.remove(l)
                     except ValueError:
                         ailettersonbothrackcopy.remove('*')
-                #suit = True
                 for pidx in range(1, len(pattern1)):
                     if pattern1[pidx] != '.':
                         if pattern1[pidx] == '*':

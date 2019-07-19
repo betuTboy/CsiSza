@@ -3381,7 +3381,6 @@ def setup1(sow):
         options.pointforeachletter = int(var47.get())
         options.ppointforeachletter = int(var48.get())
         options.aitimelimit[notebook1.index("current")] = int(var70.get())
-        print(options.startfieldx, options.startfieldy)
 
     var70a = StringVar()
     var70a.set(options.timelimit)
@@ -3526,18 +3525,15 @@ def setup1(sow):
     def com80():
         global data
         data = []
-        header = []
         for bck in bricks:
             rec = list()
             rec.append(bck.letter)
             rec.append(bck.count)
             rec.append(bck.value)
-
             rec.append(bck.type)
             rec.append(bck.rate)
             data.append(rec)
-            header = ["Betű", "Darab", "Pontszám", "Típus", "Előfordulás"]
-        letterset(header)
+        letterset("letterset")
 
     button18 = Button(f1, state=sow1, text='Készlet', width=7, command=com80)
     button18.grid(row=10, column=3)
@@ -3584,17 +3580,15 @@ def setup1(sow):
     def com81():
         global data
         data = []
-        header = []
         for lts in options.fletters:
             rec = list()
             rec.append(lts.split(",")[0])
-            rec.append(lts.split(",")[1])
-            rec.append(lts.split(",")[2])
+            rec.append(int(lts.split(",")[1]))
+            rec.append(int(lts.split(",")[2]))
             rec.append(lts.split(",")[3])
-            rec.append(lts.split(",")[4])
+            rec.append(float(lts.split(",")[4]))
             data.append(rec)
-            header = ["Betű", "Darab", "Pontszám", "Típus", "Előfordulás"]
-        letterset(header)
+        letterset("fletterset")
 
     button19 = Button(f1, state=sow1, text='Készlet', width=7, command=com81)
     button19.grid(row=13, column=3)
@@ -4129,18 +4123,26 @@ def notimplemented():
     pass
 
 
-def letterset(header):
+def letterset(caller):
     """Betűkészlet beállítása"""
     global data, entries
 
     def validateentry(event):
         global data
+        abc2 = (
+        'A', 'Á', 'B', 'C', 'CS', 'D', 'E', 'É', 'F', 'G', 'GY', 'H', 'I', 'Í', 'J', 'K', 'L', 'LY', 'M', 'N', 'NY',
+        'O', 'Ó', 'Ö', 'Ő', 'P', 'Q', 'R', 'S', 'SZ', 'T', 'TY', 'U', 'Ú', 'Ü', 'Ű', 'V', 'W', 'X', 'Y', 'Z', 'ZS')
+
         for k in range(len(data)):
             for l7 in range(len(data[k])):
                 if l7 == 0 or l7 == 3:
-                    data[k][l7] = entries[k][l7].get().upper()
+                    data[k][l7] = entries[k][l7].get().upper().strip()
                     if not (data[k][l7]).isalpha() and data[k][l7] != '*':
                         tkinter.messagebox.showerror("Hibás érték", "Csak betűket fogad a beviteli mező",
+                                                     parent=popup7)
+                        entries[k][l7].focus()
+                    if data[k][l7] not in abc2 and data[k][l7] != '*':
+                        tkinter.messagebox.showerror("Hibás érték", "A betűt nem tartalmazza a program ábécéje",
                                                      parent=popup7)
                         entries[k][l7].focus()
                     if l7 == 3 and data[k][l7] not in ['C', 'N', 'V']:
@@ -4148,7 +4150,7 @@ def letterset(header):
                                                      parent=popup7)
                         entries[k][l7].focus()
                 elif l7 == 1 or l7 == 2:
-                    data[k][l7] = entries[k][l7].get()
+                    data[k][l7] = entries[k][l7].get().strip()
                     try:
                         int(data[k][l7])
                     except ValueError:
@@ -4156,7 +4158,7 @@ def letterset(header):
                                                      parent=popup7)
                         entries[k][l7].focus()
                 elif l7 == 4:
-                    data[k][l7] = entries[k][l7].get()
+                    data[k][l7] = entries[k][l7].get().strip()
                     try:
                         float(data[k][l7])
                     except ValueError:
@@ -4166,16 +4168,28 @@ def letterset(header):
 
     def com1():
         global data
+        global bricks
+        global options
         popup7.destroy()
-        bricks = []
         letterstrl = []
+        if caller == "letterset":
+            bricks = []
+        else:
+            options.fletters = []
         for line1 in range(len(data)):
             letterstrl.append(data[line1][0]+','+str(data[line1][1])+','+str(data[line1][2])+','+data[line1][3]+','
                               +str(data[line1][4]))
-            bricks.append(Brick(data[line1][0]+','+str(data[line1][1])+','+str(data[line1][2])+','+
-                                data[line1][3]+','+str(data[line1][4])))
+            if caller == "letterset":
+                bricks.append(Brick(data[line1][0]+','+str(data[line1][1])+','+str(data[line1][2])+','+
+                                    data[line1][3]+','+str(data[line1][4])))
+            else:
+                options.fletters.append(",".join(data[line1]))
         letterstr = "\n" + "\n".join(letterstrl)
-        config.set('Letters', 'letters', letterstr)
+        if caller == "letterset":
+            config.set('Letters', 'letters', letterstr)
+        else:
+            config.set('Rules', 'fletters', letterstr)
+
 
     def createentries():
         global data, entries
@@ -4262,6 +4276,7 @@ def letterset(header):
     def conf(event):
         canvas5.configure(scrollregion=canvas5.bbox("all"))
 
+    header = ["Betű", "Darab", "Pontszám", "Típus", "Előfordulás"]
     recordpointerindex = 0
     popup7 = Toplevel()
     popup7.title("Betűkészlet")
@@ -5242,6 +5257,7 @@ def drawboard():
                                  fill=bground, outline=fc)
     # Rack1 rajzolása:
     if options.usefletters:
+        frackfields = [0] * len(options.fletters)
         for n in range(len(options.fletters)):
             frackfields[n] = Field(".", 0, z + 2, n)
             frackfields[n].x = n * (options.size + options.gap) + offset
