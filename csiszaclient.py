@@ -4127,11 +4127,11 @@ def letterset(caller):
     """Betűkészlet beállítása"""
     global data, entries
 
-    def validateentry(event):
+    def validateentry():
         global data
-        abc2 = (
-        'A', 'Á', 'B', 'C', 'CS', 'D', 'E', 'É', 'F', 'G', 'GY', 'H', 'I', 'Í', 'J', 'K', 'L', 'LY', 'M', 'N', 'NY',
-        'O', 'Ó', 'Ö', 'Ő', 'P', 'Q', 'R', 'S', 'SZ', 'T', 'TY', 'U', 'Ú', 'Ü', 'Ű', 'V', 'W', 'X', 'Y', 'Z', 'ZS')
+        abc2 = ('A', 'Á', 'B', 'C', 'CS', 'D', 'E', 'É', 'F', 'G', 'GY', 'H', 'I', 'Í', 'J', 'K', 'L', 'LY', 'M', 'N',
+                'NY','O', 'Ó', 'Ö', 'Ő', 'P', 'Q', 'R', 'S', 'SZ', 'T', 'TY', 'U', 'Ú', 'Ü', 'Ű', 'V', 'W', 'X', 'Y',
+                'Z', 'ZS')
 
         for k in range(len(data)):
             for l7 in range(len(data[k])):
@@ -4141,14 +4141,17 @@ def letterset(caller):
                         tkinter.messagebox.showerror("Hibás érték", "Csak betűket fogad a beviteli mező",
                                                      parent=popup7)
                         entries[k][l7].focus()
-                    if data[k][l7] not in abc2 and data[k][l7] != '*':
+                        return 0
+                    if l7 == 0 and data[k][l7] not in abc2 and data[k][l7] != '*':
                         tkinter.messagebox.showerror("Hibás érték", "A betűt nem tartalmazza a program ábécéje",
                                                      parent=popup7)
                         entries[k][l7].focus()
+                        return 0
                     if l7 == 3 and data[k][l7] not in ['C', 'N', 'V']:
                         tkinter.messagebox.showerror("Hibás érték", "A mező értéke csak C, N vagy V lehet",
                                                      parent=popup7)
                         entries[k][l7].focus()
+                        return 0
                 elif l7 == 1 or l7 == 2:
                     data[k][l7] = entries[k][l7].get().strip()
                     try:
@@ -4157,6 +4160,7 @@ def letterset(caller):
                         tkinter.messagebox.showerror("Hibás érték", "Csak egész számot fogad a beviteli mező",
                                                      parent=popup7)
                         entries[k][l7].focus()
+                        return 0
                 elif l7 == 4:
                     data[k][l7] = entries[k][l7].get().strip()
                     try:
@@ -4165,13 +4169,17 @@ def letterset(caller):
                         tkinter.messagebox.showerror("Hibás érték", "Csak tizedes törtet fogad a beviteli mező",
                                                      parent=popup7)
                         entries[k][l7].focus()
+                        return 0
+        return 1
 
     def com1():
         global data
         global bricks
         global options
-        popup7.destroy()
         letterstrl = []
+        if not validateentry():
+            return
+        popup7.destroy()
         if caller == "letterset":
             bricks = []
         else:
@@ -4201,7 +4209,7 @@ def letterset(caller):
                 entries[i][j].grid(row=i + 1, column=j)
                 entries[i][j].insert(END, data[i][j])
                 entries[i][j].bind("<ButtonRelease-1>", getrecordpointerindex)
-                entries[i][j].bind("<FocusOut>", validateentry)
+                # entries[i][j].bind("<FocusOut>", validateentry)
                 frame500.grid_columnconfigure(j, pad=pad1)
                 if i == recordpointerindex and j ==0:
                     entries[i][j].focus()
@@ -4232,7 +4240,7 @@ def letterset(caller):
             record[jj].grid(row= 100, column=jj)
             record[jj].insert(END, data[-1][jj])
             record[jj].bind("<ButtonRelease-1>", getrecordpointerindex)
-            record[jj].bind("<FocusOut>", validateentry)
+            # record[jj].bind("<FocusOut>", validateentry)
             if jj == 0:
                 record[jj].focus()
             frame500.grid_columnconfigure(jj, pad=pad1)
