@@ -1,3 +1,9 @@
+# CsiSza v0.21
+
+## Változások:
+
+- A szótár frissítése 2.1 verzióra. 
+ 
 # CsiSza v0.2
 
 ## Változások:
