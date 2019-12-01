@@ -421,7 +421,7 @@ def init1():
     for i in range(fieldrc):
         for j in range(fieldcc):
             fields[i][j] = Field(board[i][j], 0, i, j)
-    partsofdictionary = loaddictionary("szotar20c_kat.dic", limit)
+    partsofdictionary = loaddictionary("szotar21a_kat.dic", limit)
     found = False
     for i in range(fieldrc):          # Ha az első lépés előtt már vannak betűk a táblán, és kötelező a kapcsolódás
         for j in range(fieldcc):

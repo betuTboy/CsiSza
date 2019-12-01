@@ -5055,7 +5055,7 @@ def loaddictionary():
     """Szótár betöltése"""
     global dictionary
     global partsofdictionary
-    file = "szotar20c_kat.dic"
+    file = "szotar21a_kat.dic"
     abc2 = ('A', 'Á', 'B', 'C', 'CS', 'D', 'E', 'É', 'F', 'G', 'GY', 'H', 'I', 'Í', 'J', 'K', 'L', 'LY', 'M', 'N', 'NY',
            'O', 'Ó', 'Ö', 'Ő', 'P', 'Q', 'R', 'S', 'SZ', 'T', 'TY', 'U', 'Ú', 'Ü', 'Ű', 'V', 'W', 'X', 'Y', 'Z', 'ZS')
     for letter1 in abc2:
@@ -5711,7 +5711,7 @@ def about1():
     aboutpopup = Toplevel(appwin)
     sct = tkinter.scrolledtext.ScrolledText(master=aboutpopup)
     sct.pack()
-    sct.insert("1.0", "\n                           CsiSza v0.2\n\n\n"
+    sct.insert("1.0", "\n                           CsiSza v0.21\n\n\n"
                       
                       "   Saját szórakoztatásomra készítettem ezt a programot, de úgy\n"
                       "   gondolom, hogy mások számára is hasznos lehet. A GPLv3 licensz\n"
