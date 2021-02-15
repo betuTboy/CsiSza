@@ -1,3 +1,17 @@
+# CsiSza v0.3
+
+## Változások:
+- A szótár frissítése 2.2 verzióra.
+- A tábla mezőihez 1-9 pontos jutalom rendelhető.
+- A kerülhetnek a táblára a játék indításakor kisorsolt betűk.
+- Nagyobb, "felfedezhető" táblák beláthatósága korlátozható.
+- A betűtartókat összefogó szabadon mozgatható tálca, kiegészítve a gyakrabban használt funkciókat megvalósító gyorsgombokkal.
+- A magánhangzók+dzsókerek és a mássalhangzók aránya befolyásolható.
+- A közös betűk tartójára beállítható, hogy a kirakott betű helyére újabb kerüljön a következő körre. 
+- A szavak érvényességének ellenőrzése történhet csak a játék végén.
+- Ha a szavak érvényességének ellenőrzése csak a játék végén történik, akkor a felesleges betűk megjelölhetőek, és figyelmen kívül     lesznek hagyva a pontszámításnál. Ilyen típusú játéknál beállíthatóak a szavak hossza alapján számolt jutalmak.  
+- Sok apró javítás.
+
 # CsiSza v0.21
 
 ## Változások:
@@ -34,13 +48,13 @@ a stackoverflow.com oldalon található diskurzusokból.
 
 ## Teendők:
   - [ ] hibák javítása
-  - [ ] használható dokumentáció
+  - [x] használható dokumentáció
   - [x] választható erősségű (szókincs korlátozása, vagy a legjobb szó pontértékének százalékában
         korlátozott) gépi ellenfél a szimultán játékhoz
   - [ ] választható erősségű és játékstílusú (szókincs, stratégia) gépi ellenfél egyéb játékhoz
   - [ ] GUI tökéletesítése
   - [ ] távoli játék
-  - [ ] új funkciók
+  - [x] új funkciók
 
 License
 
