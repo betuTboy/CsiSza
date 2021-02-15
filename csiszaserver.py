@@ -15,7 +15,7 @@ games = []
 class Game:
     """A játékok osztálya"""
 
-    def __init__(self, board, numberofplayers, sack, q):
+    def __init__(self, board, numberofplayers, sack, bricks, q):
         self.state = 0  # 0=nyitott; 1=megtelt,fut; 2=megszakadt; 3=felfüggesztett; 4=befejeződött
         self.board = board
         self.fieldrc = 1
@@ -27,6 +27,7 @@ class Game:
         self.firstplayer = 0
         self.sack = sack
         self.sack1 = copy.deepcopy(self.sack)
+        self.bricks = bricks
         self.optionsstr = ""
         self.turns = 0
         self.countofpasses = 0
@@ -92,6 +93,10 @@ class Game:
         self.options.ppointforeachletter = int(optionslist[26].split(',')[1])
         self.options.independentboards = self.strtobool(optionslist[27].split(',')[1])
         self.options.changeincreasepasses = self.strtobool(optionslist[28].split(',')[1])
+        self.options.limitedvisibility = self.strtobool(optionslist[29].split(',')[1])
+        self.options.optimizeddraw = self.strtobool(optionslist[30].split(',')[1])
+        self.options.resetfrack = self.strtobool(optionslist[31].split(',')[1])
+        self.options.checkattheend = self.strtobool(optionslist[32].split(',')[1])
         self.optionsstr = ";".join(optionslist)
         if self.options.resetsack and not self.options.resetall:
             self.options.lettersetmode = 2
@@ -117,14 +122,7 @@ class Game:
                     break
         # print("sack:", len(self.sack))
         for i in range(letter):
-            while 1:  # Ha a zsákból nem fogy a betű (lettersetmode 2 vagy 3), akkor nem lehet senkinek egynél több
-                # dzsóker a tartóján
-                randomnumber = randrange(len(self.sack))
-                if self.options.lettersetmode != 1 and self.sack[randomnumber][0] == '*' and jokeronrack:
-                    continue
-                break
-            if self.sack[randomnumber][0] == '*':
-                jokeronrack = True
+            randomnumber = self.drawletter(i, pla)
             self.players[pla].lettersonrack.append(self.sack[randomnumber])
             self.players[pla].lettersonracksave.append(copy.deepcopy(self.sack[randomnumber]))
             newletters.append(self.sack[randomnumber])
@@ -149,15 +147,70 @@ class Game:
                             self.players[pla].lettersonrack[-1][2] = str(mvalues[rn])
             del self.sack[randomnumber]
         if self.options.duplicate and (self.plwanttochange == len(self.players) or self.novalidword):
-            newlettersstr = "DUPSWAP" + "," + str(len(newletters) * 3) + self.letterlisttostr(newletters)
+            newlettersstr = "DUPSWAP" + "," + str(len(newletters) * 4) + self.letterlisttostr(newletters)
         else:
-            newlettersstr = "NEWLETTERS" + "," + str(len(newletters) * 3) + self.letterlisttostr(newletters)
+            newlettersstr = "NEWLETTERS" + "," + str(len(newletters) * 4) + self.letterlisttostr(newletters)
         return newlettersstr
+
+    def sortsack(self):
+        sackc = []
+        sackv = []
+        for letter in self.sack:
+            if letter[1] == 'C':
+                sackc.append(letter)
+            if letter[1] == 'V' or letter[1] == 'N':
+                sackv.append(letter)
+        return sackc, sackv
+
+    def countvowelsonrack(self, pla):
+        """Megállapítja a tartón levő magánhangzók+dzsókerek számát, a tartón levő karaktereket és előfordulásuk számát egy
+        dict-ben adja vissza"""
+        numberofvowels = 0
+        lrack = dict()
+        for letter in self.players[pla].lettersonrack:
+            if letter != 0 and letter is not None:
+                if letter[0] in lrack:
+                    lrack[letter[0]] += 1
+                else:
+                    lrack[letter[0]] = 1
+                if letter[3] == 'V' or letter[3] == 'N':
+                    numberofvowels += 1
+        return numberofvowels, lrack
+
+    def drawletter(self,i, pla):
+        """Alapesetben kihúz egy véletlen betűt, ha az options.optimizeddraw = True, akkor amíg a szükséges számú betűt
+         tartalmazza a zsák, addig a magánhangzók+dzsókerek számát 40-60%-os arányban  tartja, illetve maximum 2
+         egyforma betű lehet egyidejűleg a tartón, ha van még elég betű a zsákban"""
+        while 1:
+            randomnumber = randrange(len(self.sack))
+            if self.options.optimizeddraw:
+                sackc, sackv = self.sortsack()
+                numberofvowels, lrack = self.countvowelsonrack(pla)
+
+                #print("mhg", "msg", "arány", numberofvowels, lrack, numberofvowels / self.options.racksize)
+                if (i + 1) / options.racksize > 0.6:
+                    if self.sack[randomnumber][1] == 'C' and numberofvowels / self.options.racksize < 0.4 and len(sackv) > 0:
+                        print("magánhangzót inkább")
+                        continue
+                    if self.sack[randomnumber][1] == 'V' and numberofvowels / self.options.racksize > 0.6 and len(sackc) > 0:
+                        print("mássalhangzót inkább")
+                        continue
+                if self.sack[randomnumber][0] in lrack and lrack[self.sack[randomnumber][0]] == 2:
+                    print("van már belőle kettő a tartón", self.sack[randomnumber][0])
+                    cou = 0
+                    for letter in self.sack:
+                        if letter[1] == self.sack[randomnumber][1]:
+                            cou += 1
+                    if cou > 2:
+                        continue
+            break
+        return randomnumber
 
     def gamestart(self):
         """Normál módban itt indul a játék"""
         boardstr = self.boardtostr()
         sackstr = "SACK" + self.letterlisttostr(self.sack)
+        bricksstr = "ABCLETTERS" + self.letterlisttostr(self.bricks)
         randomnumber = randrange(len(self.players))
         self.currentplayer = randomnumber
         self.firstplayer = self.currentplayer
@@ -168,6 +221,8 @@ class Game:
         sendmessage(self.players, (boardstr + "|").encode())
         time.sleep(.5)
         sendmessage(self.players, (sackstr + "|").encode())
+        time.sleep(.5)
+        sendmessage(self.players, (bricksstr + "|").encode())
         if self.options.usefletters:
             for player in self.players:
                 for l in self.options.fletters:
@@ -180,9 +235,9 @@ class Game:
             leonrastr = ""
             for le in range(len(player.lettersonrack)):
                 z1 = "," + player.lettersonrack[le][0] + "," + player.lettersonrack[le][1] + "," + str(
-                    player.lettersonrack[le][2])
+                    player.lettersonrack[le][2]) + "," + player.lettersonrack[le][3]
                 leonrastr += z1
-            lettersonrackstr = "LETTERSONRACK" + "," + str(3 * len(player.lettersonrack)) + leonrastr
+            lettersonrackstr = "LETTERSONRACK" + "," + str(4 * len(player.lettersonrack)) + leonrastr
             sendmessage([player], (lettersonrackstr + "|").encode())
         time.sleep(.5)
         sendmessage(self.players, "START|".encode())
@@ -198,6 +253,7 @@ class Game:
         """Duplicate módban itt indul a játék"""
         boardstr = self.boardtostr()
         sackstr = "SACK" + self.letterlisttostr(self.sack)
+        bricksstr = "ABCLETTERS" + self.letterlisttostr(self.bricks)
         sendmessage(self.players, ("NUMOFPLAYERS," + str(self.numberofplayers + "|")).encode())
         time.sleep(.5)
         self.giveletters(0, self.options.racksize)
@@ -207,12 +263,13 @@ class Game:
         time.sleep(.5)
         sendmessage(self.players, (sackstr + "|").encode())
         time.sleep(.5)
+        sendmessage(self.players, (bricksstr + "|").encode())
         leonrastr = ""
         for le in range(len(self.players[0].lettersonrack)):
             z1 = "," + self.players[0].lettersonrack[le][0] + "," + self.players[0].lettersonrack[le][1] + "," + str(
-                self.players[0].lettersonrack[le][2])
+                self.players[0].lettersonrack[le][2]) + "," + self.players[0].lettersonrack[le][3]
             leonrastr += z1
-        lettersonrackstr = "LETTERSONRACK," + str(3 * len(self.players[0].lettersonrack)) + leonrastr
+        lettersonrackstr = "LETTERSONRACK," + str(4 * len(self.players[0].lettersonrack)) + leonrastr
         sendmessage(self.players, (lettersonrackstr + "|").encode())
         time.sleep(.5)
         sendmessage(self.players, "START|".encode())
@@ -324,6 +381,8 @@ class Game:
             message1 += str(letters[i][1])
             message1 += ","
             message1 += str(letters[i][2])
+            message1 += ","
+            message1 += str(letters[i][3])
         return message1
 
     def writeboard(self, receivedmessage, name):
@@ -340,8 +399,8 @@ class Game:
         z = 1
         lob = []
         while z < len(messagelist3[1:]):
-            lob.append(messagelist3[z:z + 3])
-            z += 3
+            lob.append(messagelist3[z:z + 4])
+            z += 4
         if not self.options.duplicate:
             messagelist4 = commandlist[3].split(',')
             for player in self.players:
@@ -385,7 +444,7 @@ class Game:
                         sor += self.board[i][j] + " "
                     else:
                         sor += self.board[i][j]
-                # print(sor)
+                #print("server",sor)
                 sor = ""
         if self.options.duplicate:
             self.managerack(lob, self.players[0].thread)
@@ -511,8 +570,8 @@ class Game:
     def changeletters(self, messagelist, name):
         """Csere"""
         changedletters = []
-        for i in range(len(messagelist) // 3):
-            changedletters.append(messagelist[i * 3:(i + 1) * 3])
+        for i in range(len(messagelist) // 4):
+            changedletters.append(messagelist[i * 4:(i + 1) * 4])
         self.managerack(changedletters, name)
         for i in range(len(changedletters)):
             for j in range(len(self.sack1)):
@@ -533,8 +592,8 @@ class Game:
         z = 1
         lob = []
         while z < len(messagelist3[1:]):
-            lob.append(messagelist3[z:z + 3])
-            z += 3
+            lob.append(messagelist3[z:z + 4])
+            z += 4
         for player in self.players:
             if player.thread == th:
                 for i in range(len(player.frack)):
@@ -608,8 +667,8 @@ class ThreadClient(threading.Thread):
     @staticmethod
     def strtosack(messagelist):
         sack = []
-        for i in range(len(messagelist) // 3):
-            sack.append(messagelist[i * 3:(i + 1) * 3])
+        for i in range(len(messagelist) // 4):
+            sack.append(messagelist[i * 4:(i + 1) * 4])
         return sack
 
     def managebuffer(self, receivedmessage):
@@ -648,17 +707,19 @@ class ThreadClient(threading.Thread):
             commandlist = message.split(';')
             messagelist1 = commandlist[1].split(',')
             board = self.strtoboard(messagelist1)
-            numberofplayers = commandlist[3]
+            numberofplayers = commandlist[4]
             messagelist2 = commandlist[2].split(',')
             sack = self.strtosack(messagelist2[1:])
+            messagelist3 = commandlist[3].split(',')
+            bricks = self.strtosack(messagelist3[1:])
             locking.acquire()
-            games.append(Game(board, numberofplayers, sack, queue1))
+            games.append(Game(board, numberofplayers, sack, bricks, queue1))
             self.gamenumber = len(games) - 1
             locking.release()
             games[self.gamenumber].fieldrc = int(messagelist1[1])
             games[self.gamenumber].fieldcc = int(messagelist1[2])
             # print("Gamenumber: " + str(self.gamenumber))
-            games[self.gamenumber].manageoptions(commandlist[5:])
+            games[self.gamenumber].manageoptions(commandlist[6:])
             messagelist1 = commandlist[0].split(',')
             self.playername = messagelist[1].split(';')[0]
             games[self.gamenumber].players.append(Player(name, conn_client[name], messagelist1[1]))

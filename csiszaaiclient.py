@@ -35,7 +35,6 @@ aimove = ""
 turns = 0
 timesup = False
 
-
 class Field:
     """A mezők osztálya"""
 
@@ -77,6 +76,7 @@ class ThreadReception(threading.Thread):
         global sack1
         global turns
         global numberofplayers
+        global bricks
         messagelist = rmessage.split(',')
         if messagelist[0] == "OK":
             pass
@@ -88,8 +88,8 @@ class ThreadReception(threading.Thread):
             manageoptions(optionslist[1:])
             if options.usefletters:
                 for fl in options.fletters:
-                    fl1 = fl.split(',')[:3]
-                    ailettersonfrackl.append([fl1[0], fl1[2], '1'])
+                    fl1 = fl.split(',')[:4]
+                    ailettersonfrackl.append([fl1[0], fl1[2], '1', fl1[3]])
                 # print("frack", ailettersonfrackl)
             else:
                 ailettersonfrackl = []
@@ -99,16 +99,18 @@ class ThreadReception(threading.Thread):
         elif messagelist[0] == "SACK":
             sack = strtoletterlist(messagelist[1:])
             sack1 = sack[:]
+        elif messagelist[0] == "ABCLETTERS":
+            bricks = strtoletterlist(messagelist[1:])
         elif messagelist[0] == "LETTERSONRACK":
             i = 0
             ailettersonrackl = []
-            while i < (int(messagelist[1]) // 3):
-                ailettersonrackl.append(messagelist[2 + i * 3:5 + i * 3])
+            while i < (int(messagelist[1]) // 4):
+                ailettersonrackl.append(messagelist[2 + i * 4:6 + i * 4])
                 i += 1
             lob = strtoletterlist(messagelist[2:])
             removefromsack(lob)
         elif messagelist[0] == "START":
-            for brick in sack:
+            for brick in bricks:
                 if brick[0] != '*' and brick[0] not in ainotjokerletters:
                     ainotjokerletters.append(brick[0])
                     ainotjokerlettersl.append(brick)
@@ -140,11 +142,11 @@ class ThreadReception(threading.Thread):
             manageboard(move, 1)
         elif messagelist[0] == "NEWLETTERS":
             i = 0
-            while i < (int(messagelist[1]) // 3):
+            while i < (int(messagelist[1]) // 4):
                 found = False
                 for n in range(len(ailettersonrackl)):
                     if ailettersonrackl[n] is None:
-                        ailettersonrackl[n] = messagelist[2 + i * 3:5 + i * 3]
+                        ailettersonrackl[n] = messagelist[2 + i * 4:6 + i * 4]
                         found = True
                         break
                 if not found:
@@ -155,8 +157,8 @@ class ThreadReception(threading.Thread):
         elif messagelist[0] == "DUPSWAP":
             ailettersonrackl = []
             i = 0
-            while i < (int(messagelist[1]) // 3):
-                ailettersonrackl.append(messagelist[2 + i * 3:5 + i * 3])
+            while i < (int(messagelist[1]) // 4):
+                ailettersonrackl.append(messagelist[2 + i * 4:6 + i * 4])
                 i += 1
             lob = strtoletterlist(messagelist[2:])
             removefromsack(lob)
@@ -228,8 +230,8 @@ def strtoboard(messagelist):
 
 def strtoletterlist(messagelist):
     letterlist = []
-    for i in range(len(messagelist) // 3):
-        letterlist.append(messagelist[i * 3:(i + 1) * 3])
+    for i in range(len(messagelist) // 4):
+        letterlist.append(messagelist[i * 4:(i + 1) * 4])
     return letterlist
 
 
@@ -290,6 +292,10 @@ def manageoptions(optionslist):
     options.ppointforeachletter = int(optionslist[26].split(',')[1])
     options.independentboards = strtobool(optionslist[27].split(',')[1])
     options.changeincreasepasses = strtobool(optionslist[28].split(',')[1])
+    options.limitedvisibility = strtobool(optionslist[29].split(',')[1])
+    options.optimizeddraw = strtobool(optionslist[30].split(',')[1])
+    options.resetfrack = strtobool(optionslist[31].split(',')[1])
+    options.checkattheend = strtobool(optionslist[32].split(',')[1])
 
 
 def removefromrack(lob):
@@ -328,6 +334,7 @@ def manageboard(move, caller):
     global fields
     global ailettersonrackl
     global firstmove
+    #print("ailettersonrackl", ailettersonrackl)
     direction = move[4]
     lob = move[5]
     if len(lob) > 0:
@@ -399,7 +406,7 @@ def manageboard(move, caller):
                 sor += fields[i][j].type1 + " "
             else:
                 sor += fields[i][j].type1
-        # print(sor)
+        #print("ai",sor)
         sor = ""
 
 
@@ -411,6 +418,7 @@ def init1():
     global firstmove
     global numberofplayers
     global limit, strength
+    global boardtype
     if len(sys.argv) > 1:
         options.aitimelimit = int(sys.argv[1])
         limit = sys.argv[2]
@@ -421,7 +429,18 @@ def init1():
     for i in range(fieldrc):
         for j in range(fieldcc):
             fields[i][j] = Field(board[i][j], 0, i, j)
-    partsofdictionary = loaddictionary("szotar21a_kat.dic", limit)
+    wallnumber = 0
+    fieldnumber = 0
+    for i in range(fieldrc):
+        for j in range(fieldcc):
+            if board[i][j] == '!':
+                wallnumber += 1
+            fieldnumber += 1
+    if wallnumber / fieldnumber > 0.3:
+        boardtype = "crossword"
+    else:
+        boardtype = "basic"
+    partsofdictionary = loaddictionary("szotar22a_kat.dic", limit)
     found = False
     for i in range(fieldrc):          # Ha az első lépés előtt már vannak betűk a táblán, és kötelező a kapcsolódás
         for j in range(fieldcc):
@@ -735,7 +754,7 @@ def aifindplace(partsofdictionary, numofletters, aifields, ailettersonbothrackl)
                             if firstmove:                                          # A kezdő mezőre esik a minta?
                                 if i == options.startfieldy and j + listitem == options.startfieldx:
                                     startfield = True
-                                    # Ha kötelező a kapcsolódás, akkor ez a minta kapcsolódik-e:
+                            # Ha kötelező a kapcsolódás, akkor ez a minta kapcsolódik-e:
                             if options.connect:
                                 if not conn:
                                     if i > 0:
@@ -791,7 +810,6 @@ def aifindplace(partsofdictionary, numofletters, aifields, ailettersonbothrackl)
                         rec.append(words)
                         patterns1.append(rec)
                         if int(time.time() - starttime) > options.aitimelimit - 10:
-                            # print("Time2")
                             return validwords
                     if len(words) > 0:
                         for pword in words:
@@ -910,7 +928,6 @@ def allpossiblescoring(pword, pattern1, ailettersonbothrackl):
                             loblnew.append(lob2copy)
         lobl = loblnew
         if int(time.time() - starttime) > options.aitimelimit - 10:
-            # print("Time4")
             timesup = True
             return []
     for lob1 in lobl:
@@ -1140,6 +1157,8 @@ def wordscore(word1, ii, jj, direction, lob1):
                     wordscore1 += sc
                 if fields[ii][jj + x].type1 != "old":
                     ul += 1
+                    if len(fields[ii][jj + x].type1) == 1 and fields[ii][jj + x].type1.isdigit():
+                        wordscore1 += int(fields[ii][jj + x].type1)
     if direction == "down":
         for y in range(len(word1)):
             if fields[ii + y][jj].type1 not in options.fieldsdict:
@@ -1166,6 +1185,8 @@ def wordscore(word1, ii, jj, direction, lob1):
                     wordscore1 += sc
                 if fields[ii + y][jj].type1 != "old":
                     ul += 1
+                    if len(fields[ii+y][jj].type1) == 1 and fields[ii+y][jj].type1.isdigit():
+                        wordscore1 += int(fields[ii+y][jj].type1)
     wordscore1 = wordscore1 * wordvaluemulti
     if options.lengthbonus:
         if ul == 2:
@@ -1202,13 +1223,12 @@ def selectmove(allvalidwordscores):
         if validword[6] == sortedlist[i-1][6]:
             choice1.append(validword)
     selectedaimove = choice1[randrange(len(choice1))]
+    #print ("selectedaimove", selectedaimove)
     finishmove(selectedaimove)
 
 
 def finishmove(selectedaimove):
     """Befejezi a lépést. A kiválasztott szót elküldi a szervernek"""
-    global board
-    global fields
     global moveofai
     global aimove
     global ailettersonrackl
@@ -1243,6 +1263,7 @@ def finishmove(selectedaimove):
     wordsinmove = "+".join(wordsfieldss)
     moveofai = "MOVE" + "," + wordsinmove + ";POS," + str(ii) + "," + str(jj) + ";DIR," + selectedaimove[4] \
                + ";SCORE," + str(selectedaimove[6]) + ";LOB" + letterlisttostr(lob1) + ";LOBCH," + lobch
+    #print("moveofai", moveofai)
     if int(time.time() - starttime) > options.aitimelimit - 2:
         # print("Time5")
         return
@@ -1264,6 +1285,8 @@ def letterlisttostr(letters):
         message1 += str(brick[1])
         message1 += ","
         message1 += str(brick[2])
+        message1 += ","
+        message1 += str(brick[3])
     return message1
 
 

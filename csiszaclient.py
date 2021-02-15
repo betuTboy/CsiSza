@@ -24,6 +24,7 @@ from tkinter.colorchooser import askcolor
 from tkinter.ttk import Notebook, Combobox, Progressbar, Style
 
 import csiszaoptions
+import manual
 
 try:
     import enchant
@@ -39,12 +40,11 @@ turnscore = 0
 totalscore = 0
 buttonsack = []
 board = []
-# options = []
+boardoriginal = []
 timeractive = False
 timesup = False
 icon1 = icon2 = None
 config = None
-# queue1 = None
 tooltipson = False
 ruleson1 = 0
 notebook = None
@@ -76,7 +76,13 @@ abc = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O'
        'W', 'X', 'Y', 'Z']
 abc1 = []
 lastword = ''
-
+checktime = False
+contiguousletters = []
+onthestartfield = False
+image11 = None
+anchorimage = None
+moverack = False
+tray = None
 
 class Part:
     """A játéktér területei"""
@@ -126,6 +132,9 @@ class Field:
         self.changedletter = None
         self.multiplier = 1
         self.wordmultiplier = 1
+        self.objectlist = [None] * 5
+        self.ignored = False
+        self.visible = True
         self.f1x = 0
         self.f1y = 0
         self.f2x = 0
@@ -219,6 +228,7 @@ class ThreadReception(threading.Thread):
         fl = optionslist[14].split(',')[2:]
         for i in range(len(fl) // 5):
             options.fletters.append(",".join(fl[i * 5:(i + 1) * 5]))
+        #print("fletters", options.fletters)
         options.valueofchangedletter = strtobool(optionslist[15].split(',')[1])
         options.duplicate = strtobool(optionslist[16].split(',')[1])
         options.timelimit = int(optionslist[17].split(',')[1])
@@ -305,6 +315,7 @@ class ThreadReception(threading.Thread):
         if messagelist[0] == "NOGAME":
             boardstr = boardtostr()
             sackstr = sacktostr()
+            bricksstr = brickstostring()
             optionsstr = "OPTIONS;RACKSIZE," + str(options.racksize) + ";RANDOMMPL," + booltostr(
                 options.randommultiplier) + ";CONNECT," + booltostr(options.connect) + ";STARTFIELD," + booltostr(
                 options.startfield) + "," + str(options.startfieldx) + "," + str(
@@ -332,13 +343,18 @@ class ThreadReception(threading.Thread):
                 options.penaltyforleft) + ";PVALUEFOREACHLETTER," + booltostr(
                 options.pvalueforeachletter) + ";PPOINTFOREACHLETTER," + str(
                 options.ppointforeachletter) + ";INDEPENDENTBOARDS," + booltostr(
-                options.independentboards) + ";CHANGEINCREASEPASSES," + booltostr(options.changeincreasepasses)
+                options.independentboards) + ";CHANGEINCREASEPASSES," + booltostr(
+                options.changeincreasepasses) + ";LIMITEDVISIBILITY," + booltostr(
+                options.limitedvisibility) + ";OPTIMIZEDDRAW," + booltostr(
+                options.optimizeddraw) + ";RESETFRACK," + booltostr(
+                options.resetfrack) + ";CHECKATTHEEND," +booltostr(
+                options.checkattheend)
             if options.gamemode == 2:
                 nopponents = options.aiopponent
             if options.gamemode == 3:
                 nopponents = options.networkopponent
             # print("sent: LAUNCH," + options.username + ";" + boardstr + ";" + sackstr + ";" + str(nopponents + 1))
-            self.connection.send(("LAUNCH," + options.username + ";" + boardstr + ";" + sackstr + ";" + str(
+            self.connection.send(("LAUNCH," + options.username + ";" + boardstr + ";" + sackstr + ";" + bricksstr + ";" + str(
                 nopponents + 1) + ";" + optionsstr + "|").encode())
             chatboxmessage("Új játékot indítottál\n")
         elif messagelist[0] == "GAMEEXIST":
@@ -360,6 +376,8 @@ class ThreadReception(threading.Thread):
             sack1 = sack[:]
             for i in range(len(sack)):
                 sackl.append([sack[i].letter, sack[i].value, sack[i].wordmultiplier])
+        elif messagelist[0] == "ABCLETTERS":
+            bricks = listtobrick(messagelist[1:])
         elif messagelist[0] == "LETTERSONRACK":
             lettersonrack = takenewfromsack(messagelist[2:])
         elif messagelist[0] == "START":
@@ -495,7 +513,7 @@ def strtoboard(messagelist):
 
 
 def boardtostr():
-    global board
+    #global board
     message1 = "BOARD" + "," + str(len(board)) + "," + str(len(board[0]))
     for i in range(len(board)):
         for j in range(len(board[0])):
@@ -505,15 +523,22 @@ def boardtostr():
 
 
 def sacktostr():
-    global sack
+    #global sack
     global sackl
     letters1 = []
-    for i in range(len(sack)):
-        letters1.append(",".join([sack[i].letter, str(sack[i].value), "1"]))
-        sackl.append([sack[i].letter, sack[i].value, sack[i].wordmultiplier])
+    for brck in sack:
+        letters1.append(",".join([brck.letter, str(brck.value), "1",brck.type]))
+        sackl.append([brck.letter, brck.value, brck.wordmultiplier])
     message1 = ",".join(["LETTERS", ",".join(letters1)])
     return message1
 
+
+def brickstostring():
+    letters1 = []
+    for brck in bricks:
+        letters1.append(",".join([brck.letter, str(brck.value), "1", brck.type]))
+    message1 = ",".join(["ABCLETTERS", ",".join(letters1)])
+    return message1
 
 def strtobool(strg):
     if strg == "1":
@@ -538,7 +563,7 @@ def listtobrick(letterlist):
                     letterbricks[-1].multiplier = 1
                 break
         letterbricks[-1].wordmultiplier = int(letterlist[i + 2])
-        i += 3
+        i += 4
     return letterbricks
 
 
@@ -595,6 +620,10 @@ def save1():
     flettersstr = "\n" + "\n".join(options.fletters)
     saveg.set('Rules', 'fletters', flettersstr)
     saveg.set('Rules', 'valueofchangedletter', str(options.valueofchangedletter))
+    saveg.set('Rules', 'limitedvisibility', str(options.limitedvisibility))
+    saveg.set('Rules', 'optimizeddraw', str(options.optimizeddraw))
+    saveg.set('Rules', 'resetfrack', str(options.resetfrack))
+    saveg.set('Rules', 'checkattheend', str(options.checkattheend))
     saveg.set('Bonuses', 'lengthbonus', str(options.lengthbonus))
     saveg.set('Bonuses', 'twoletterbonus', str(options.twoletterbonus))
     saveg.set('Bonuses', 'threeletterbonus', str(options.threeletterbonus))
@@ -605,6 +634,16 @@ def save1():
     saveg.set('Bonuses', 'eightletterbonus', str(options.eightletterbonus))
     saveg.set('Bonuses', 'nineletterbonus', str(options.nineletterbonus))
     saveg.set('Bonuses', 'tenletterbonus', str(options.tenletterbonus))
+    saveg.set('Bonuses', 'wordlengthbonus', str(options.wordlengthbonus))
+    saveg.set('Bonuses', 'wordtwoletterbonus', str(options.wordtwoletterbonus))
+    saveg.set('Bonuses', 'wordthreeletterbonus', str(options.wordthreeletterbonus))
+    saveg.set('Bonuses', 'wordfourletterbonus', str(options.wordfourletterbonus))
+    saveg.set('Bonuses', 'worfiveletterbonus', str(options.wordfiveletterbonus))
+    saveg.set('Bonuses', 'wordsixletterbonus', str(options.wordsixletterbonus))
+    saveg.set('Bonuses', 'wordsevenletterbonus', str(options.wordsevenletterbonus))
+    saveg.set('Bonuses', 'wordeightletterbonus', str(options.wordeightletterbonus))
+    saveg.set('Bonuses', 'wordnineletterbonus', str(options.wordnineletterbonus))
+    saveg.set('Bonuses', 'wordtenletterbonus', str(options.wordtenletterbonus))
     saveg.set('Bonuses', 'oldbonusonly', str(options.oldbonusonly))
     saveg.set('Bonuses', 'useoldbonus', str(options.useoldbonus))
     saveg.set('Bonuses', 'useoldbonusvalue', str(options.useoldbonusvalue))
@@ -625,6 +664,12 @@ def save1():
     board11 = "\n".join(boardtext)
     board10 += board11
     saveg.set('Board', 'board', board10)
+    for v in range(len(boardoriginal)):
+        boardtext[v] = " ".join(boardoriginal[v])
+    board10 = "\n"
+    board11 = "\n".join(boardtext)
+    board10 += board11
+    saveg.set('Board', 'boardoriginal', board10)
     boardsaveletter = []
     boardsavevalue = []
     boardsavemultiplier = []
@@ -729,6 +774,8 @@ def load1():
     global options
     global sack, sack1
     global countofpasses
+    global sec, sec1, c1
+    global boardoriginal
     options.lastopenedcfg = tkinter.filedialog.askopenfilename(initialdir=".", title="Válaszd ki a kívánt mentést",
                                                                filetypes=(
                                                                    ("Mentett játékok", "*.sav"), ("all files", "*.*")))
@@ -742,20 +789,25 @@ def load1():
     options.createfieldsdict()
     drawboard()
     # Mentett tábla visszaállítása
+    boardos = config.get('Board', 'boardoriginal')
     fields1l = config.get('Board', 'savedboardletters')
     fields1v = config.get('Board', 'savedboardvalues')
     fields1m = config.get('Board', 'savedboardmultipliers')
     fields1wm = config.get('Board', 'savedboardwordmultipliers')
+    boardoss = boardos.splitlines()
     fieldrowsl = fields1l.splitlines()
     fieldrowsv = fields1v.splitlines()
     fieldrowsm = fields1m.splitlines()
     fieldrowswm = fields1wm.splitlines()
     r = len(fieldrowsl)
+    boardoriginal = []
     saveboardletters = []
     saveboardvalues = []
     saveboardmultipliers = []
     saveboardwordmultipliers = []
     for b in range(1, r):
+        boardol = boardoss[b].split(' ')
+        boardoriginal.append(boardol)
         fields2 = fieldrowsl[b].split(' ')
         saveboardletters.append(fields2)
         fields2 = fieldrowsv[b].split(' ')
@@ -834,6 +886,9 @@ def load1():
         rack[j].objectlist[2] = canvas1.create_text(rackfields[j].b1x + options.wx, rackfields[j].b1y + options.wy,
                                                     font=(options.valuefont, options.valuefontsize), text=rack[j].value,
                                                     fill=options.colorvaluebrick, tags=str(j))
+        canvas1.addtag_withtag('racks', rack[j].objectlist[0])
+        canvas1.addtag_withtag('racks', rack[j].objectlist[1])
+        canvas1.addtag_withtag('racks', rack[j].objectlist[2])
         rackfields[j].type = "occupied"
     # Fix betűk visszaállítása
     if options.usefletters:
@@ -879,6 +934,9 @@ def load1():
                                                                  font=(options.valuefont, options.valuefontsize),
                                                                  text=frack[j].value, fill=options.colorvaluebrick,
                                                                  tags=str(j))
+                    canvas1.addtag_withtag('racks', frack[j].objectlist[0])
+                    canvas1.addtag_withtag('racks', frack[j].objectlist[1])
+                    canvas1.addtag_withtag('racks', frack[j].objectlist[2])
                     break
     # Forduló száma
     turns = int(config.get('Board', 'turns'))
@@ -890,7 +948,9 @@ def load1():
     # Pontszám
     totalscore = int(config.get('Board', 'totalscore'))
     button2.configure(state="normal")
+    fb2.configure(state="normal")
     button3.configure(state="normal")
+    fb3.configure(state="normal")
     if options.gamemode != 1:
         button4.configure(state="disabled")
     counter.config(state="normal")
@@ -898,15 +958,20 @@ def load1():
     score2.config(state="normal")
     timer.config(state="normal")
     button0.config(state="normal")
+    fb0.config(state="normal")
     button1.config(state="normal")
+    fb1.config(state="normal")
     checkb1.config(state="normal")
     checkb2.config(state="normal")
     score2.config(text=str(totalscore))
     bind1()
-    button6.configure(state="normal")
+    button6.configure(state="normal", text="Szünet")
+    c1 = True
     starttimer()
     chatboxmessage("A mentett játék betöltése kész\n")
     menubar.entryconfig("Beállítások", state="disabled")
+    if options.checkattheend:
+        options.checkmode = 4
 
 
 def start():
@@ -961,12 +1026,17 @@ def start():
     score2.config(state="normal")
     timer.config(state="normal")
     button0.config(state="normal")
+    fb0.config(state="normal")
     button1.config(state="normal")
+    fb1.config(state="normal")
     if not options.independentboards:
         button2.config(state="normal")
+        fb2.config(state="normal")
     button3.config(state="normal")
+    fb3.config(state="normal")
     if options.duplicate and options.gamemode != 1:
         button3a.config(state="normal")
+        fb3a.config(state="normal")
     checkb1.config(state="normal")
     checkb2.config(state="normal")
     if options.gamemode == 1:
@@ -982,6 +1052,8 @@ def start():
         bind1()
         starttimer()
         chatboxmessage("Új játékot indítottál\n")
+        if options.checkattheend:
+            options.checkmode = 4
     elif options.gamemode == 2:
         askname()
         ts = threading.Thread(target=startserver)
@@ -1114,18 +1186,24 @@ def askname():
 def lockon():
     """Funkciók elérésének korlátozása"""
     button2.configure(state="disabled")
+    fb2.configure(state="disabled")
     button3.configure(state="disabled")
+    fb3.configure(state="disabled")
     if options.duplicate:
         button3a.configure(state="disabled")
+        fb3a.configure(state="disabled")
 
 
 def lockoff():
     """Funkciók elérésének engedése"""
     if not options.independentboards:
         button2.configure(state="normal")
+        fb2.configure(state="normal")
     button3.configure(state="normal")
+    fb3.configure(state="normal")
     if options.duplicate and options.gamemode != 1:
         button3a.configure(state="normal")
+        fb3a.configure(state="normal")
 
 
 def starttimer():
@@ -1161,6 +1239,13 @@ def timelimit():
     if options.gamemode == 1:
         chatboxmessage("Nincs érvényes szó\n")
         turns += 1
+        if options.turnlimit and turns == options.turnlimitcount:
+            if options.checkmode == 4:
+                checkboard()
+                return
+            else:
+                endofgame()
+                return
         counter.configure(text=turns + 1)
         if options.resetall:
             resetsack(rack)
@@ -1239,13 +1324,23 @@ def repairboard():
 
 def mouseldown(event):
     """Bal oldali gomb lenyomására végrehajtandó művelet"""
-    appwin.x1, appwin.y1 = canvas1.canvasx(event.x), canvas1.canvasy(event.y)
     global selectedbrick
     global selectedbricki
     global fields
     global rackfields
     global frackfields
     global whichrack
+    global moverack
+    appwin.x1, appwin.y1 = canvas1.canvasx(event.x), canvas1.canvasy(event.y)
+    if checktime:
+        return
+    mx, my = canvas1.canvasx(event.x), canvas1.canvasy(event.y)
+    x1, y1, x2, y2 = canvas1.bbox(anchorimage)
+    if x1 < mx < x2 and y1 < my < y2:
+        moverack = True
+        return
+    else:
+        moverack = False
     for i in range(options.racksize):
         if rack[i] is not None and (rack[i].x <= appwin.x1 <= rack[i].x + (options.size - 1) and rack[
                                     i].y <= appwin.y1 <= rack[i].y + (options.size - 1)):
@@ -1290,18 +1385,23 @@ def mouseldown(event):
                 for n in range(len(frack)):
                     if frackfields[n].x == selectedbrick.x and frackfields[n].y == selectedbrick.y:
                         frackfields[n].type = "."
-                    for nn in range(fieldrc):
-                        for o in range(fieldcc):
-                            if fields[nn][o].x == selectedbrick.x and fields[nn][o].y == selectedbrick.y:
-                                fields[nn][o].type = board[nn][o]
+                for nn in range(fieldrc):
+                    for o in range(fieldcc):
+                        if fields[nn][o].x == selectedbrick.x and fields[nn][o].y == selectedbrick.y:
+                            fields[nn][o].type = board[nn][o]
 
 
 def mouselmove(event):
-    """Lenyomott bal oldali gombbal mozgó egérrel végrehajtandó művelet"""
+    """Lenyomott bal oldali gombbal, mozgó egérrel végrehajtandó művelet"""
     x2, y2 = canvas1.canvasx(event.x), canvas1.canvasy(event.y)
     dx, dy = x2 - appwin.x1, y2 - appwin.y1
+    if event.x < 5 or event.x > canvas1.winfo_width()-5 or event.y < 5 or event.y > canvas1.winfo_height()-5:
+        canvas1.event_generate("<ButtonRelease-1>")
     if canvas1.find_withtag('sel'):
         canvas1.move('sel', dx, dy)
+        appwin.x1, appwin.y1 = x2, y2
+    if moverack:
+        canvas1.move('racks', dx, dy)
         appwin.x1, appwin.y1 = x2, y2
 
 
@@ -1311,18 +1411,26 @@ def mouselrelease(event):
     global fields
     global rackfields
     global whichrack
+    global moverack
     appwin.x, appwin.y = canvas1.canvasx(event.x), canvas1.canvasy(event.y)
+    if moverack:
+        updatecoords()
+        moverack = False
+        return
+    if options.checkmode == 4 and checktime == True:
+        ignoreletter(appwin.x, appwin.y)
+        selectedbrick = None
     if selectedbrick is None:
         return
     closest = closesti = closestj = None
     distance = 10000
     x = canvas1.bbox(selectedbrick.objectlist[0])[0]
     y = canvas1.bbox(selectedbrick.objectlist[0])[1]
-    if ontheboard(appwin.x, appwin.y):
+    if ontheboard(appwin.x, appwin.y) and not onthetray(appwin.x, appwin.y):
         for i in range(fieldrc):
             for j in range(fieldcc):
                 if fields[i][j].type in options.fieldsdict:
-                    if options.fieldsdict[fields[i][j].type][2] == 1:
+                    if options.fieldsdict[fields[i][j].type][2] == 1 and fields[i][j].visible:
                         distancenew = math.sqrt((fields[i][j].x - x) ** 2 + (fields[i][j].y - y) ** 2)
                         if distancenew < distance:
                             closesti = i
@@ -1354,7 +1462,14 @@ def mouselrelease(event):
             if options.valueofchangedletter:
                 canvas1.delete(selectedbrick.objectlist[2])
             changejoker(selectedbrick)
+        if selectedbrick.letter in letterreplacedict:
+            canvas1.delete(selectedbrick.objectlist[1])
+            changeletter(selectedbrick)
         fields[closesti][closestj].type = "occupied"
+        canvas1.dtag(selectedbrick.objectlist[0], 'racks')
+        canvas1.dtag(selectedbrick.objectlist[1], 'racks')
+        canvas1.dtag(selectedbrick.objectlist[2], 'racks')
+        raisetray()
     else:
         if whichrack == "rack":
             for i in range(options.racksize):
@@ -1382,6 +1497,10 @@ def mouselrelease(event):
             canvas1.coords(selectedbrick.objectlist[2], rackfields[closest].b1x + options.wx,
                            rackfields[closest].b1y + options.wy)
             rackfields[closest].type = "occupied"
+            canvas1.addtag_withtag('racks', selectedbrick.objectlist[0])
+            canvas1.addtag_withtag('racks', selectedbrick.objectlist[1])
+            canvas1.addtag_withtag('racks', selectedbrick.objectlist[2])
+
             # rack[] lista rackfields[] szerinti sorrendjének helyreállítása:
             for i in range(options.racksize):
                 if selectedbrick.x == rackfields[i].x and i != selectedbricki:
@@ -1406,8 +1525,101 @@ def mouselrelease(event):
             canvas1.coords(selectedbrick.objectlist[1], frackdict[selectedbrick].cx, frackdict[selectedbrick].cy + 2)
             canvas1.coords(selectedbrick.objectlist[2], frackdict[selectedbrick].b1x + options.wx,
                            frackdict[selectedbrick].b1y + options.wy)
+            canvas1.addtag_withtag('racks', selectedbrick.objectlist[0])
+            canvas1.addtag_withtag('racks', selectedbrick.objectlist[1])
+            canvas1.addtag_withtag('racks', selectedbrick.objectlist[2])
     selectedbrick = None
     canvas1.dtag(ALL, 'sel')
+
+
+def ignoreletter(x, y):
+    """Ha a táblán lévő szavak érvényességének ellenőrzése a játék végén történik, a fölösleges betűk megjelölése"""
+    global fields
+    for i in range(fieldrc):
+        for j in range(fieldcc):
+            if fields[i][j].b1x < x < fields[i][j].b2x and fields[i][j].b1y < y < fields[i][j].b2y:
+                if fields[i][j].ignored == False:
+                    colofi = options.colornormal
+                    colobo = options.colornormal
+                    colotx = "#bebebe"
+                    colovtx = "#bebebe"
+                    fields[i][j].ignored = True
+                else:
+                    colofi = options.colornormalbrick
+                    colobo = options.colorborderbrick
+                    colotx = options.colortextbrick
+                    colovtx = options.colorvaluebrick
+                    fields[i][j].ignored = False
+                canvas1.itemconfig( fields[i][j].objectlist[0], fill=colofi, outline=colobo)
+                canvas1.itemconfig( fields[i][j].objectlist[1], fill=colotx)
+                #if options.valuedisplay:
+                canvas1.itemconfig( fields[i][j].objectlist[2], fill=colovtx)
+
+
+def detectabove(brick1):
+    if canvas1.find_above(brick1.objectlist[0]):
+        canvas1.tag_raise(brick1.objectlist[0])
+        canvas1.tag_raise(brick1.objectlist[1])
+        canvas1.tag_raise(brick1.objectlist[2])
+
+
+def raisetray():
+    rackobjects = canvas1.find_withtag("racks")
+    for robj in rackobjects:
+        canvas1.tag_raise(robj)
+
+
+def updatecoords():
+    """Betűtartó áthelyezése után a mezők új koordinátáinak eltárolása"""
+    global rackfields
+    global frackfields
+    global rack
+    #tray_xy = [canvas1.bbox(tray)[0], canvas1.bbox(tray)[1]]
+    rackfields[0].x = canvas1.bbox(rackfields[0].objectlist[0])[0]
+    rackfields[0].y = canvas1.bbox(rackfields[0].objectlist[0])[1]
+    #print("tray",tray_xy)
+    for i in range(options.racksize):
+        rackfields[i].x = rackfields[0].x + i * (options.size + options.gap)
+        rackfields[i].y = rackfields[0].y
+        rackfields[i].cx = rackfields[i].x + options.size / 2 - 1
+        rackfields[i].cy = rackfields[i].y + options.size / 2 - 1
+        rackfields[i].b1x = rackfields[i].x + (options.size - options.bricksize) / 2
+        rackfields[i].b1y = rackfields[i].y + (options.size - options.bricksize) / 2
+        rackfields[i].b2x = rackfields[i].x + (options.size - options.bricksize) / 2 + options.bricksize - 1
+        rackfields[i].b2y = rackfields[i].y + (options.size - options.bricksize) / 2 + options.bricksize - 1
+    for i in range(options.racksize):
+        if rack[i] is not None and len(canvas1.gettags(rack[i].objectlist[0])) > 1:
+            rack[i].x = rackfields[i].x
+            rack[i].y = rackfields[i].y
+            rack[i].cx = rackfields[i].cx
+            rack[i].cy = rackfields[i].cy
+            rack[i].b1x = rackfields[i].b1x
+            rack[i].b1y = rackfields[i].b1y
+            rack[i].b2x = rackfields[i].b2x
+            rack[i].b2y = rackfields[i].b2y
+    if options.usefletters:
+        frackfields[0].x = canvas1.bbox(frackfields[0].objectlist[0])[0]
+        frackfields[0].y = canvas1.bbox(frackfields[0].objectlist[0])[1]
+        for i in range(len(options.fletters)):
+            frackfields[i].x = frackfields[0].x + i * (options.size + options.gap)
+            frackfields[i].y = frackfields[0].y
+            frackfields[i].cx = frackfields[i].x + options.size / 2 - 1
+            frackfields[i].cy = frackfields[i].y + options.size / 2 - 1
+            frackfields[i].b1x = frackfields[i].x + (options.size - options.bricksize) / 2
+            frackfields[i].b1y = frackfields[i].y + (options.size - options.bricksize) / 2
+            frackfields[i].b2x = frackfields[i].x + (options.size - options.bricksize) / 2 + options.bricksize - 1
+            frackfields[i].b2y = frackfields[i].y + (options.size - options.bricksize) / 2 + options.bricksize - 1
+        for i in range(len(frack)):
+            if frack[i] is not None and len(canvas1.gettags(frack[i].objectlist[0])) > 1:
+                frack[i].x = frackdict[frack[i]].x
+                frack[i].y = frackdict[frack[i]].y
+                frack[i].cx = frackdict[frack[i]].cx
+                frack[i].cy = frackdict[frack[i]].cy
+                frack[i].b1x = frackdict[frack[i]].b1x
+                frack[i].b1y = frackdict[frack[i]].b1y
+                frack[i].b2x = frackdict[frack[i]].b2x
+                frack[i].b2y = frackdict[frack[i]].b2y
+    raisetray()
 
 
 def mouserdown(event):
@@ -1432,7 +1644,7 @@ def mouserdown(event):
                 pass
             x = canvas1.bbox(selectedbrick.objectlist[0])[0]
             y = canvas1.bbox(selectedbrick.objectlist[0])[1]
-            if ontheboard(appwin.x1, appwin.y1):
+            if ontheboard(appwin.x1, appwin.y1)  and not onthetray(appwin.x1, appwin.y1):
                 for ii in range(options.racksize):
                     if rackfields[ii].type == ".":
                         distancenew = math.sqrt((rackfields[ii].x - x) ** 2 + (rackfields[ii].y - y) ** 2)
@@ -1463,6 +1675,9 @@ def mouserdown(event):
                 canvas1.coords(selectedbrick.objectlist[2], rackfields[closest].b1x + options.wx,
                                rackfields[closest].b1y + options.wy)
                 rackfields[closest].type = "occupied"
+                canvas1.addtag_withtag('racks', selectedbrick.objectlist[0])
+                canvas1.addtag_withtag('racks', selectedbrick.objectlist[1])
+                canvas1.addtag_withtag('racks', selectedbrick.objectlist[2])
             else:
                 if not options.duplicate and not options.resetsack:  # Olyan játékban, amelyben a betűk visszakerülnek
                     # a zsákba, nem lehet egyenként cserélni
@@ -1524,6 +1739,11 @@ def mouserdown(event):
                                frackdict[selectedbrick].cy + 2)
                 canvas1.coords(selectedbrick.objectlist[2], frackdict[selectedbrick].b1x + options.wx,
                                frackdict[selectedbrick].b1y + options.wy)
+                canvas1.addtag_withtag('racks', selectedbrick.objectlist[0])
+                canvas1.addtag_withtag('racks', selectedbrick.objectlist[1])
+                canvas1.addtag_withtag('racks', selectedbrick.objectlist[2])
+                break
+    detectabove(selectedbrick)
     selectedbrick = None
 
 
@@ -1532,6 +1752,9 @@ def ontheboard(x, y):
     if tabla.x1 <= x <= tabla.x2 and tabla.y1 <= y <= tabla.y2:
         return True
 
+def onthetray(x, y):
+    if (canvas1.bbox(tray)[0] < x < canvas1.bbox(tray)[2]) and (canvas1.bbox(tray)[1] < y < canvas1.bbox(tray)[3]):
+        return True
 
 def showrack(newletters):
     """Az új betűket elhelyezi a tartón (csak többjátékos módok)"""
@@ -1562,6 +1785,9 @@ def showrack(newletters):
         rack[j].objectlist[2] = canvas1.create_text(rackfields[j].b1x + options.wx, rackfields[j].b1y + options.wy,
                                                     font=(options.valuefont, options.valuefontsize), text=rack[j].value,
                                                     fill=options.colorvaluebrick, tags=str(j))
+        canvas1.addtag_withtag("racks", rack[j].objectlist[0])
+        canvas1.addtag_withtag("racks", rack[j].objectlist[1])
+        canvas1.addtag_withtag("racks", rack[j].objectlist[2])
         j += 1
         if i == len(newletters):
             break
@@ -1656,9 +1882,11 @@ def placeletters(msgclient):
                 canvas1.create_text(fieldstemp[i][j].cx, fieldstemp[i][j].cy + 2,
                                     font=(options.letterfont, options.letterfontsize), text=l1,
                                     fill=options.colortextbrick)
-                canvas1.create_text(fieldstemp[i][j].b1x + options.wx, fieldstemp[i][j].b1y + options.wy,
+                valuetext = canvas1.create_text(fieldstemp[i][j].b1x + options.wx, fieldstemp[i][j].b1y + options.wy,
                                     font=(options.valuefont, options.valuefontsize), text=lob1[k].value,
                                     fill=options.colorvaluebrick)
+                if not options.valuedisplay:
+                    canvas1.itemconfig(valuetext, state="hidden")
                 if c2 is not None:
                     canvas1.create_polygon((fieldstemp[i][j].b2x - 9, fieldstemp[i][j].b1y, fieldstemp[i][j].b2x + 1,
                                             fieldstemp[i][j].b1y, fieldstemp[i][j].b2x, fieldstemp[i][j].b1y + 9),
@@ -1716,6 +1944,7 @@ def placeletters(msgclient):
     else:
         managesack()
         printboard()
+    raisetray()
 
 
 def numberstoletters(i):
@@ -1770,7 +1999,8 @@ def swapwithserver():
     global queue1
 
     def listtostr(wanttochangel1):
-        message11 = "CHANGE," + str(len(wanttochangel1) * 3)
+        message11 = "CHANGE," + str(len(wanttochangel1) * 4)
+        print("wanttochange", wanttochangel1)
         for ii in range(len(wanttochangel1)):
             message11 += ","
             message11 += str(wanttochangel1[ii][0])
@@ -1778,6 +2008,8 @@ def swapwithserver():
             message11 += str(wanttochangel1[ii][1])
             message11 += ","
             message11 += str(wanttochangel1[ii][2])
+            message11 += ","
+            message11 += str(wanttochangel1[ii][3])
         return message11
 
     wanttochangel = []
@@ -1789,7 +2021,7 @@ def swapwithserver():
                     canvas1.delete(rack[j].objectlist[1])
                     canvas1.delete(rack[j].objectlist[2])
                     rackfields[j].type = '.'
-                wanttochangel.append([rack[j].letter, rack[j].value, rack[j].wordmultiplier])
+                wanttochangel.append([rack[j].letter, rack[j].value, rack[j].wordmultiplier, rack[j].type])
     message1 = listtostr(wanttochangel)
     # print("sent: " + message1)
     queue1.put(message1)
@@ -1841,7 +2073,7 @@ def takenewfromsack(letterlist):
                 sack[j].used = True
                 sack.pop(j)
                 break
-        i += 3
+        i += 4
     return letterbricks
 
 
@@ -1872,10 +2104,11 @@ def takemovefromsack(letterlist):
                     sack[j].used = True
                     sack.pop(j)
                 break
-        if not found:  # A zsákban nem lévő betűk (az ellenfél fix betűi)
-            eletter = Brick(",".join([letterlist[i], '1', letterlist[i + 1], 'N', '0']))
+        if not found:  # A zsákban nem lévő betűk (az ellenfél közös betűi)
+            print("letterlist",letterlist)
+            eletter = Brick(",".join([letterlist[i], '1', letterlist[i + 1], letterlist[i + 2], '0']))
             letterbricks.append(eletter)
-        i += 3
+        i += 4
     return letterbricks
 
 
@@ -1901,7 +2134,7 @@ def takefromrack(letterlist):
                     canvas1.delete(rack[j].objectlist[2])
                     indices.remove(j)
                     break
-        i += 3
+        i += 4
     return letterbricks
 
 
@@ -1933,11 +2166,24 @@ def backtosack(lettersback):
         sack.append(lettersback[k])
 
 
+def deletefrack():
+    global frack
+    for fr in frack:
+        for frs in frackfields:
+            if fr.x == frs.x and fr.y == frs.y:
+                canvas1.delete(fr.objectlist[0])
+                canvas1.delete(fr.objectlist[1])
+                canvas1.delete(fr.objectlist[2])
+
+
 def loadfrack():
     """A közös betűket helyezi a tartóra"""
     global frack
     global frackfields
     global frackdict
+
+    deletefrack()
+    frack = []
     frackdict = dict()
     for i in range(len(options.fletters)):
         frack.append(Brick(options.fletters[i]))
@@ -1959,6 +2205,9 @@ def loadfrack():
         frack[i].objectlist[2] = canvas1.create_text(frackfields[i].x + options.wx, frackfields[i].y + options.wy,
                                                      font=(options.valuefont, options.valuefontsize),
                                                      text=frack[i].value, fill=options.colorvaluebrick, tags=str(i))
+        canvas1.addtag_withtag('racks', frack[i].objectlist[0])
+        canvas1.addtag_withtag('racks', frack[i].objectlist[1])
+        canvas1.addtag_withtag('racks', frack[i].objectlist[2])
 
 
 def resetsack(lob):
@@ -1978,7 +2227,7 @@ def resetsack(lob):
                 i.value = i.changedvalue
                 i.changedvalue = None
             i.changedletter = None
-            if not ontheboard(i.x, i.y):
+            if len(canvas1.gettags(i.objectlist[0])) > 1:
                 canvas1.delete(i.objectlist[0])
                 canvas1.delete(i.objectlist[1])
                 canvas1.delete(i.objectlist[2])
@@ -2008,16 +2257,8 @@ def loadrack():
     global lettersonrack
     j = 0
     lettersonrack = rack
-    jokeronrack = False
-    try:
-        for i in range(len(rack)):
-            if rack[i].letter == '*':
-                jokeronrack = True
-                break
-    except Exception:
-        pass
     while j < options.racksize:
-        if len(sack) == 0:                  # Ha nincs már betű a zsákban
+        if len(sack) == 0:  # Ha nincs már betű a zsákban
             lettersonrack = []
             for i in range(len(rack)):
                 if rack[i] is not None:
@@ -2029,14 +2270,7 @@ def loadrack():
             starttimer()
             return
         if rackfields[j].type == ".":
-            while 1:               # Ha a zsákból nem fogy a betű (lettersetmode 2 vagy 3), akkor nem lehet egynél több
-                #  dzsóker a tartón
-                randomnumber = randrange(len(sack))
-                if options.lettersetmode != 1 and sack[randomnumber].letter == '*' and jokeronrack:
-                    pass
-                break
-            if sack[randomnumber].letter == '*':
-                jokeronrack = True
+            randomnumber = drawletter(j)
             rack[j] = sack[randomnumber]
             rack[j].x = rackfields[j].x
             rack[j].y = rackfields[j].y
@@ -2048,7 +2282,6 @@ def loadrack():
             rack[j].b2y = rackfields[j].b2y
             if options.randomlettervalue:
                 if rack[j].letter != '*' or options.dontchangejoker:
-                    # values = copy.deepcopy(options.values)
                     values = options.values[:]
                     rn = randrange(len(values))
                     rack[j].value = values[rn]
@@ -2085,6 +2318,11 @@ def loadrack():
             rack[j].objectlist[2] = canvas1.create_text(rackfields[j].b1x + options.wx, rackfields[j].b1y + options.wy,
                                                         font=(options.valuefont, options.valuefontsize),
                                                         text=rack[j].value, fill=options.colorvaluebrick, tags=str(j))
+            if not options.valuedisplay:
+                canvas1.itemconfig(rack[j].objectlist[2], state="hidden")
+            canvas1.addtag_withtag("racks", rack[j].objectlist[0])
+            canvas1.addtag_withtag("racks", rack[j].objectlist[1])
+            canvas1.addtag_withtag("racks", rack[j].objectlist[2])
             sack[randomnumber].used = True
             sack.pop(randomnumber)
         j += 1
@@ -2094,8 +2332,65 @@ def loadrack():
     starttimer()
 
 
+def sortsack():
+    sackc = []
+    sackv = []
+    for bck in sack:
+        if bck.type == 'C':
+            sackc.append(bck)
+        if bck.type == 'V' or bck.type == 'N':
+            sackv.append(bck)
+    return sackc, sackv
+
+
+def countvowelsonrack():
+    """Megállapítja a tartón levő magánhangzók+dzsókerek számát, a tartón levő karaktereket és előfordulásuk számát egy
+    dict-ben adja vissza"""
+    numberofvowels = 0
+    lrack = dict()
+    for bck in rack:
+        if bck != 0 and bck is not None:
+            if bck.letter in lrack:
+                lrack[bck.letter] += 1
+            else:
+                lrack[bck.letter] = 1
+            if bck.type == 'V' or bck.type == 'N':
+                numberofvowels += 1
+    return numberofvowels, lrack
+
+
+def drawletter(j):
+    """Alapesetben kihúz egy véletlen betűt, ha az options.optimizeddraw = True, akkor amíg a szükséges számú betűt
+     tartalmazza a zsák, addig a magánhangzók+dzsókerek számát 40-60%-os arányban  tartja, illetve maximum 2
+     egyforma betű lehet egyidejűleg a tartón, ha van még elég betű a zsákban"""
+    while 1:
+        randomnumber = randrange(len(sack))
+        if options.optimizeddraw:
+            sackc, sackv = sortsack()
+            numberofvowels, lrack = countvowelsonrack()
+
+            #print("mhg", "msg","arány", numberofvowels, lrack, numberofvowels / options.racksize )
+            if (j+1) / options.racksize > 0.6:
+                if sack[randomnumber].type == 'C' and numberofvowels / options.racksize < 0.4 and len(sackv) > 0:
+                    #print("magánhangzót inkább")
+                    continue
+                if sack[randomnumber].type == 'V' and numberofvowels / options.racksize > 0.6 and len(sackc) > 0:
+                    #print("mássalhangzót inkább")
+                    continue
+            if sack[randomnumber].letter in lrack and lrack[sack[randomnumber].letter] == 2:
+                #print("van már belőle kettő a tartón", sack[randomnumber].letter)
+                cou = 0
+                for bck in sack:
+                    if bck.type == sack[randomnumber].type:
+                        cou += 1
+                if cou > 2:
+                    continue
+        break
+    return randomnumber
+
+
 def changejoker(sbrick):
-    """Dzsóker becserélését szolgáló ablakot jeleníti meg"""
+    """Dzsóker becserélésére szolgáló ablakot jeleníti meg"""
     global popup1
     popup1 = Toplevel()
     popup1.transient(appwin)
@@ -2145,6 +2440,38 @@ def changej(letter, sbrick):
     popup1.destroy()
 
 
+def changeletter(sbrick):
+    """Betű kicserélésére szolgáló ablakot jeleníti meg"""
+    global popup1
+    popup1 = Toplevel()
+    popup1.transient(appwin)
+    popup1.title("Válaszd ki a megfelelő betűt")
+    popup1.protocol("WM_DELETE_WINDOW", close2)
+    x1, y1, x2, y2 = canvas1.bbox(sbrick.objectlist[0])
+    x = x2 + canvas1.winfo_rootx()
+    y = y2 + canvas1.winfo_rooty()
+    popup1.wm_geometry("%dx%d+%d+%d" % (3*options.size, options.size, x, y))
+    button = ['.'] * len(letterreplacedict[sbrick.letter])
+    for i in range(len(letterreplacedict[sbrick.letter])):
+        letter = letterreplacedict[sbrick.letter][i]
+        button[i] = Button(popup1, width=buttonwidth + 2, height=1, padx=1, pady=1, text=letter, font=("Sans", 15),
+                           bg="#cecece", command=lambda letter=letter: changel(letter, sbrick))
+        button[i].grid(row=i // 7, column=i % 7)
+        i += 1
+    popup1.grab_set()
+    appwin.wait_window(popup1)
+
+
+def changel(letter, sbrick):
+    """Lerakott karaktert a megfelelő betűre cseréli a táblán"""
+    sbrick.changedletter = letter
+    # print("changed:", sbrick.changedletter)
+    sbrick.objectlist[1] = canvas1.create_text(sbrick.cx, sbrick.cy + 2,
+                                               font=(options.letterfont, options.letterfontsize),
+                                               text=sbrick.changedletter)
+    popup1.destroy()
+
+
 def lettersontheboard():
     """A játékos által a táblára rakott betűket vizsgálja (van-e lerakott betű, egyvonalba esnek-e, vízszintesen vagy
     függőlegesen )"""
@@ -2157,36 +2484,222 @@ def lettersontheboard():
     k = []
     across = down = True
     for i in range(len(urack)):
-        if urack[i] is not None and ontheboard(urack[i].x, urack[i].y):
+        if urack[i] is not None and ontheboard(urack[i].x, urack[i].y) and not onthetray(urack[i].x, urack[i].y):
             k.append(urack[i])
-    if options.onedirection and len(k) < 2:
-        short()
-        return
-    if len(k) > 0:
-        for i in range(len(k)):
-            if k[i].y != k[0].y:
-                across = False
-                break
-        for i in range(len(k)):
-            if k[i].x != k[0].x:
-                down = False
-                break
-        if across:
-            direction = "across"
-            lob = sorted(k, key=attrgetter('x'))
-        elif down:
-            direction = "down"
-            lob = sorted(k, key=attrgetter('y'))
+    if options.checkmode != 4:
+        if options.onedirection and len(k) < 2:
+           short()
+           return
+        if len(k) > 0:
+            for i in range(len(k)):
+                if k[i].y != k[0].y:
+                    across = False
+                    break
+            for i in range(len(k)):
+                if k[i].x != k[0].x:
+                    down = False
+                    break
+            if across:
+                direction = "across"
+                lob = sorted(k, key=attrgetter('x'))
+            elif down:
+                direction = "down"
+                lob = sorted(k, key=attrgetter('y'))
+            else:
+                # Ha nem esnek egyvonalba:
+                notline()
+                return
+            validmove(lob, direction)
+        # Passz?
         else:
-            # Ha nem esnek vonalba:
-            notline()
+            pass1()
             return
-        validmove(lob, direction)
-    # Passz?
     else:
-        pass1()
-        return
+        manageboard(k)
 
+
+def manageboard(lob):
+    """Ha a szavak érvényességének ellenőrzése csak a játék végén történik, akkor tábla aktualizálása
+    itt történik"""
+    global fieldrc
+    global fieldcc
+    global fields
+    for k in range(len(lob)):
+        for i in range(fieldrc):
+            for j in range(fieldcc):
+                if lob[k].x == fields[i][j].x and lob[k].y == fields[i][j].y:
+                    if lob[k].letter != '*' or options.dontchangejoker:
+                        if lob[k].letter != '*' and lob[k].letter in letterreplacedict:
+                            fields[i][j].type = lob[k].changedletter
+                        else:
+                            fields[i][j].type = lob[k].letter
+                    else:
+                        fields[i][j].type = lob[k].changedletter
+                    fields[i][j].value = lob[k].value
+                    fields[i][j].changedletter = lob[k].changedletter
+                    fields[i][j].multiplier = lob[k].multiplier
+                    fields[i][j].wordmultiplier = lob[k].wordmultiplier
+                    fields[i][j].objectlist[0] = lob[k].objectlist[0]
+                    fields[i][j].objectlist[1] = lob[k].objectlist[1]
+                    fields[i][j].objectlist[2] = lob[k].objectlist[2]
+                    fields[i][j].objectlist[3] = lob[k].objectlist[3]
+                    fields[i][j].objectlist[4] = lob[k].objectlist[4]
+    endmove(lob)
+
+
+def checkboard():
+    """A játék végén elindítja a tábla ellenőrzését"""
+    global checktime
+    global timeractive
+    contiguous = checkcontiguity()
+    print("contiguous",contiguous)
+    if not contiguous:
+        errormessage("A lerakott betűk között vannak, amelyek nem kapcsolódnak, vagy a szólánc nem halad át a "
+                     "kezdőmezőn (ha ez be van állítva).\nKattints az OK gombra, majd jelöld ki a felesleges betűket.\n"
+                     "Ha kész, kattints a Rendben gombra", appwin)
+        chatboxmessage("Jelöld ki azokat a betűket a táblán, amelyek eltávolítása után csak kapcsolódó betűk maradnak "
+                       "a táblán, és a szólánc áthalad a kezdőmezőn (ha az be van állítva), majd kattints a Rendben "
+                       "gombra.\n")
+        timeractive = False
+        checktime = True
+        bind1()
+        return
+    notvalid = validboard()
+    if notvalid:
+        timeractive = False
+        checktime = True
+        bind1()
+        errormessage(",".join(notvalid) + " nincs a szótárban.\nKattints az OK gombra, majd jelöld ki a felesleges "
+                                          "betűket.\nHa kész, kattints a Rendben gombra", appwin)
+        chatboxmessage(",".join(notvalid) + " nincs a szótárban\nJelöld ki azokat a betűket a táblán, amelyek "
+                                            "eltávolítása után a táblán csak érvényes szavak maradnak."
+                                            " Ha kész, kattints a Rendben gombra\n")
+    else:
+        checktime = False
+        endofgame()
+
+
+def checkcontiguity():
+    global boardtemp1
+    global boardoriginal
+    global onthestartfield
+    global contiguousletters
+    onthestartfield = False
+    boardtemp1 = copy.deepcopy(board)
+    print("boardoriginal",boardoriginal)
+    found = False
+    for i in range(fieldrc):
+        for j in range(fieldcc):
+            if not fields[i][j].ignored and fields[i][j].type != board[i][j] and boardoriginal[i][j] != '?':
+                contiguousletters = [[i, j]]
+                findneighbours()
+                found = True
+                break
+        if found:
+            break
+    for i in range(fieldrc):
+        for j in range(fieldcc):
+            if not fields[i][j].ignored and fields[i][j].type != board[i][j] and boardtemp1[i][j] != "checked" and boardoriginal[i][j] != '?':
+                print("ii,jj",i,j,fields[i][j].type,board[i][j],boardtemp1[i][j])
+                if len(contiguousletters) > 0:
+                    findneighbours()
+                    for sor in boardtemp1:
+                        print(sor)
+                return False
+    if options.startfield and not onthestartfield:
+        return False
+    return True
+
+
+def validboard():
+    """Ha a szavak érvényességének ellenőrzése csak a játék végén történik, akkor a táblára került szavak
+    ellenőrzése itt történik"""
+    global fieldrc
+    global fieldcc
+    global fields
+    wordsfields = []
+    words = []
+    # Vízszintesen:
+    for i in range(fieldrc):
+        word = ''
+        wordfields = []
+        for j in range(fieldcc):
+            if fields[i][j].type not in options.fieldsdict and not fields[i][j].ignored:
+                word += fields[i][j].type
+                if board[i][j] in options.fieldsdict:
+                    l1 = board[i][j]
+                else:
+                    l1 = "old"
+                wordfields.append([fields[i][j], l1, i, j])
+            if fields[i][j].type in options.fieldsdict or j == fieldcc-1 or fields[i][j].ignored:
+                if len(wordfields) > 1:
+                    words.append(word)
+                    print("szó",word)
+                    wordsfields.append(wordfields)
+                wordfields = []
+                word = ''
+    # Függőlegesen:
+    for j in range(fieldcc):
+        word = ''
+        wordfields = []
+        for i in range(fieldrc):
+            if fields[i][j].type not in options.fieldsdict and not fields[i][j].ignored:
+                word += fields[i][j].type
+                if board[i][j] in options.fieldsdict:
+                    l1 = board[i][j]
+                else:
+                    l1 = "old"
+                wordfields.append([fields[i][j], l1, i, j])
+            if fields[i][j].type in options.fieldsdict or i == fieldrc - 1 or fields[i][j].ignored:
+                if len(wordfields) > 1:
+                    words.append(word)
+                    print("szó",word)
+                    wordsfields.append(wordfields)
+                wordfields = []
+                word = ''
+    notvalid = findindictionary(wordsfields)
+    if notvalid:
+        return notvalid
+    boardscore(wordsfields)
+    return notvalid
+
+
+def findneighbours():
+    global boardtemp1
+    global boardoriginal
+    global onthestartfield
+    global contiguousletters
+    #print(contiguousletters)
+    i = contiguousletters[0][0]
+    j = contiguousletters[0][1]
+    #print("i,j",i,j)
+    if options.startfield:
+        if i == options.startfieldx and j == options.startfieldy:
+            onthestartfield = True
+    if i < fieldrc-1:
+        if not fields[i + 1][j].ignored and (fields[i + 1][j].type != board[i + 1][j] or boardoriginal[i + 1][j] == '?')\
+                and boardtemp1[i + 1][j] != "checked":
+            contiguousletters.append([i + 1, j])
+    if i > 0:
+        if not fields[i - 1][j].ignored and (fields[i - 1][j].type != board[i - 1][j] or boardoriginal[i - 1][j] == '?')\
+                and boardtemp1[i - 1][j] != "checked":
+            contiguousletters.append([i - 1, j])
+    if j < fieldcc-1:
+        if not fields[i][j + 1].ignored and (fields[i][j + 1].type != board[i][j + 1] or boardoriginal[i][j + 1] == '?')\
+                and boardtemp1[i][j + 1] != "checked":
+            contiguousletters.append([i, j + 1])
+    if j > 0:
+        if not fields[i][j - 1].ignored and (fields[i][j - 1].type != board[i][j - 1] or boardoriginal[i][j - 1] == '?')\
+                and boardtemp1[i][j - 1] != "checked":
+            contiguousletters.append([i, j - 1])
+    boardtemp1[i][j] = "checked"
+    contiguousletters.pop(0)
+    #print("szomszédok", contiguousletters)
+    if len(contiguousletters) > 0:
+        findneighbours()
+    else:
+        pass
+        #print("boardtemp1",boardtemp1)
 
 def validmove(lob, direction):
     """Tovább vizsgálja a lépés érvényességét (folyamatosan vannak-e a betűk, minden irányban érvényes szót alkotnak-e,
@@ -2219,7 +2732,10 @@ def validmove(lob, direction):
             for j in range(fieldcc):
                 if lob[k].x == fieldstemp[i][j].x and lob[k].y == fieldstemp[i][j].y:
                     if lob[k].letter != '*' or options.dontchangejoker:
-                        fieldstemp[i][j].type = lob[k].letter
+                        if lob[k].letter != '*' and lob[k].letter in letterreplacedict:
+                            fieldstemp[i][j].type = lob[k].changedletter
+                        else:
+                            fieldstemp[i][j].type = lob[k].letter
                     else:
                         fieldstemp[i][j].type = lob[k].changedletter
                     fieldstemp[i][j].value = lob[k].value
@@ -2271,8 +2787,7 @@ def validmove(lob, direction):
         if j < col:  # A lerakott betűk bal felső tagját keressük
             col = j
         while inside:
-            if ((fieldstemp[i][j - 1].type not in options.fieldsdict) and (
-                    fieldstemp[i][j - 1].type not in options.fieldsdict)) and j > 0:
+            if fieldstemp[i][j - 1].type not in options.fieldsdict and j > 0:
                 j -= 1
             else:
                 inside = False
@@ -2297,8 +2812,7 @@ def validmove(lob, direction):
             wordfields.append(wordrec)
             wordrec = []
             if j + 1 < fieldcc:
-                if (fieldstemp[i][j + 1].type not in options.fieldsdict) and (
-                        fieldstemp[i][j + 1].type not in options.fieldsdict):
+                if fieldstemp[i][j + 1].type not in options.fieldsdict:
                     j += 1
                 else:
                     inside = False
@@ -2336,8 +2850,7 @@ def validmove(lob, direction):
         if i < row:  # A lerakott betűk bal felső tagját keressük
             row = i
         while inside:
-            if ((fieldstemp[i - 1][j].type not in options.fieldsdict) and (
-                    fieldstemp[i - 1][j].type not in options.fieldsdict)) and i > 0:
+            if fieldstemp[i - 1][j].type not in options.fieldsdict and i > 0:
                 i -= 1
             else:
                 inside = False
@@ -2362,8 +2875,7 @@ def validmove(lob, direction):
             wordfields.append(wordrec)
             wordrec = []
             if i + 1 < fieldrc:
-                if (fieldstemp[i + 1][j].type not in options.fieldsdict) and (
-                        fieldstemp[i + 1][j].type not in options.fieldsdict):
+                if fieldstemp[i + 1][j].type not in options.fieldsdict:
                     i += 1
                 else:
                     inside = False
@@ -2400,6 +2912,7 @@ def validmove(lob, direction):
         notcontinuous()
         return
     notvalid = findindictionary(wordsfields)
+    #print("wordsfields",wordsfields)
     if notvalid is None:
         return
     # Ha minden szó érvényes, vagy nem kell vizsgálni az érvényességet:
@@ -2413,6 +2926,7 @@ def validmove(lob, direction):
             lobl.append(lob[l5].letter)
             lobl.append(str(lob[l5].value))
             lobl.append(str(lob[l5].wordmultiplier))
+            lobl.append(lob[l5].type)
         wordsfieldss = []
         for n in range(len(wordsfields)):
             ww = []
@@ -2450,7 +2964,7 @@ def validmove(lob, direction):
         if not options.duplicate:
             turnscore = 0
         firstmove = False
-    else:                                # Ha érvénytelen valamelyik szó hibaüzenet:
+    else:                                # Ha érvénytelen valamelyik szó, hibaüzenet:
         errormessage(",".join(notvalid) + " nincs a szótárban", appwin)
 
 
@@ -2470,8 +2984,12 @@ def endmove(lob):
     if options.gamemode == 1:
         turns += 1
         if options.turnlimit and turns == options.turnlimitcount:
-            endofgame()
-            return
+            if options.checkmode == 4:
+                checkboard()
+                return
+            else:
+                endofgame()
+                return
         counter.configure(text=turns + 1)
     # Kirakott betűk törlése a rack[] listából vagy az összes/felhasznált visszamegy a sack[] listába:
     if options.resetsack:
@@ -2484,6 +3002,8 @@ def endmove(lob):
     # A rack[] lista megüresedett helyeinek feltöltése:
     if options.gamemode == 1:
         loadrack()
+        if options.usefletters and options.resetfrack:
+            loadfrack()
         bind1()
     countofpasses = 0
     # Kirakott betűk törlése a frack[] listából:
@@ -2491,6 +3011,14 @@ def endmove(lob):
         for j in reversed(range(len(frack))):
             if frack[j] == lob[i]:
                 frack.pop(j)
+    # Ha a korlátozott láthatóság be van állítva, a láthatóvá váló mezők kezelése
+    if options.limitedvisibility:
+        for k in range(len(lob)):
+            for i in range(fieldrc):
+                for j in range(fieldcc):
+                   if lob[k].x == fieldstemp[i][j].x and lob[k].y == fieldstemp[i][j].y:
+                       #print("i,j",i,j)
+                       assignvisiblefields(i,j)
     if options.duplicate:
         turnscore = 0
 
@@ -2506,21 +3034,22 @@ def printrack():
 
 
 def printboard():
-    # print("")
+    print("")
     sor = ""
     if not options.duplicate or options.gamemode == 1:
         canvas1.delete("newletter")
     for i in range(fieldrc):
         for j in range(fieldcc):
-            if fields[i][j].type != fieldstemp[i][j].type:
-                canvas1.create_rectangle(fields[i][j].b1x, fields[i][j].b1y, fields[i][j].b2x, fields[i][j].b2y,
-                                         width=1, outline="yellow", tags="newletter")
-            fields[i][j] = fieldstemp[i][j]
+            if options.checkmode != 4:
+                if fields[i][j].type != fieldstemp[i][j].type:
+                   canvas1.create_rectangle(fields[i][j].b1x, fields[i][j].b1y, fields[i][j].b2x, fields[i][j].b2y,
+                                            width=1, outline="yellow", tags="newletter")
+                fields[i][j] = fieldstemp[i][j]
             if len(fields[i][j].type) == 1:
                 sor += fields[i][j].type + " "
             else:
                 sor += fields[i][j].type
-         # print(sor)
+        #print("client",sor)
         sor = ""
 
 
@@ -2562,12 +3091,13 @@ def findindictionary(wordsfields):
             if checkenchant:
                 found = spellcheck(word)
             else:
+                #print("word1l",word1l)
                 found = findinapartofdictionary(word1l)
             if not found:
                 notvalid.append(word)
             word1l = []
     if not options.checkdictionary:
-        if len(notvalid) != 0:
+        if len(notvalid) != 0 and options.checkmode != 4:
             timesup = False
             if not tkinter.messagebox.askokcancel("Érvényes?", ",".join(
                     notvalid) + " nincs a szótárban. Maradjon a táblán ennek ellenére?"):
@@ -2592,7 +3122,7 @@ def spellcheck(word):
 
 
 def score(wordsfields):
-    """Pontérték meghatározása"""
+    """Pontérték meghatározása (ha lépésenként történik)"""
     global totalscore
     global turnscore
     if turnscore != 0:
@@ -2624,6 +3154,8 @@ def score(wordsfields):
                     wordscore += wordsfields[i][j][0].value
             if wordsfields[i][j][1] != "old":
                 ul += 1
+                if len(wordsfields[i][j][1]) == 1 and wordsfields[i][j][1].isdigit():
+                    wordscore += int(wordsfields[i][j][1])
                 if wordsfields[i][j][0].wordmultiplier == 2:
                     wordvaluemulti = 2 * wordvaluemulti
                 elif wordsfields[i][j][0].wordmultiplier == 3:
@@ -2652,6 +3184,51 @@ def score(wordsfields):
         turnscore += options.wordperturnbonusvalue * (len(wordsfields) - 1)
     score1.config(text=str(turnscore))
     totalscore += turnscore
+    score2.config(text=str(totalscore))
+
+
+def boardscore(wordsfields):
+    """Pontérték meghatározása (ha a játék végén történik)"""
+    global totalscore
+    global board
+    boardtemp2 = copy.deepcopy(board)
+    for i in range(len(wordsfields)):
+        wordscore = 0
+        for j in range(len(wordsfields[i])):
+            if boardtemp2[wordsfields[i][j][2]][wordsfields[i][j][3]] == "used":
+                continue
+            if wordsfields[i][j][1] == "2L":
+                wordscore += wordsfields[i][j][0].value * 2
+            elif wordsfields[i][j][1] == "3L":
+                wordscore += wordsfields[i][j][0].value * 3
+            else:
+                if len(wordsfields[i][j][1]) == 1 and wordsfields[i][j][1].isdigit():
+                    wordscore += int(wordsfields[i][j][1])
+                if options.useoldbonus and wordsfields[i][j][1] == "old":
+                    wordscore += options.useoldbonusvalue
+                else:
+                    wordscore += wordsfields[i][j][0].value
+            boardtemp2[wordsfields[i][j][2]][wordsfields[i][j][3]] = "used"
+        if options.wordlengthbonus:
+            if len(wordsfields[i]) == 2:
+                wordscore += options.wordtwoletterbonus
+            elif len(wordsfields[i]) == 3:
+                wordscore += options.wordthreeletterbonus
+            elif len(wordsfields[i]) == 4:
+                wordscore += options.wordfourletterbonus
+            elif len(wordsfields[i]) == 5:
+                wordscore += options.wordfiveletterbonus
+            elif len(wordsfields[i]) == 6:
+                wordscore += options.wordsixletterbonus
+            elif len(wordsfields[i]) == 7:
+                wordscore += options.wordsevenletterbonus
+            elif len(wordsfields[i]) == 8:
+                wordscore += options.wordeightletterbonus
+            elif len(wordsfields[i]) == 9:
+                wordscore += options.wordnineletterbonus
+            elif len(wordsfields[i]) >= 10:
+                wordscore += options.wordtenletterbonus
+        totalscore += wordscore
     score2.config(text=str(totalscore))
 
 
@@ -2813,7 +3390,7 @@ def setup1(sow):
     CreateToolTip(label0, "Mező mérete")
 
     scale1 = Scale(tab1, length=110, orient=HORIZONTAL, troughcolor="#a9a9a9",
-                   sliderlength=20, showvalue=1, from_=15, to=45, tickinterval=10, command=com1)
+                   sliderlength=20, showvalue=1, from_=15, to=75, tickinterval=20, command=com1)
     scale1.set(options.size)
     scale1.grid(row=1, column=3)
     scale1.config(state=sow1)
@@ -2826,7 +3403,7 @@ def setup1(sow):
     CreateToolTip(label0a, "Jelölőnégyzet mérete")
 
     scale1a = Scale(tab1, length=110, orient=HORIZONTAL, troughcolor="#a9a9a9",
-                    sliderlength=20, showvalue=1, from_=0, to=options.size, tickinterval=10, command=com1a)
+                    sliderlength=20, showvalue=1, from_=0, to=options.size, tickinterval=20, command=com1a)
     scale1a.set(options.fieldsize)
     scale1a.grid(row=1, column=5)
     scale1a.config(state=sow1)
@@ -2855,7 +3432,7 @@ def setup1(sow):
 
     CreateToolTip(button01, "Szín módosítása")
 
-    label2 = Label(tab1, state=sow1, disabledforeground="gray50", text="Fix mező")
+    label2 = Label(tab1, state=sow1, disabledforeground="gray50", text="Előre beírt betű")
     label2.grid(row=3, column=1)
 
     button002 = Button(tab1, state=sow1, width=buttonwidth, bg=options.colorfix, activebackground=options.colorfix)
@@ -3055,7 +3632,7 @@ def setup1(sow):
     CreateToolTip(label10, "Betű mérete")
 
     scale3 = Scale(tab2, length=110, orient=HORIZONTAL, troughcolor="#a9a9a9", sliderlength=20,
-                   showvalue=1, from_=0, to=options.size, tickinterval=10, command=com3)
+                   showvalue=1, from_=0, to=options.size, tickinterval=20, command=com3)
     scale3.set(options.bricksize)
     scale3.grid(row=1, column=3)
     scale3.config(state=sow1)
@@ -3140,6 +3717,19 @@ def setup1(sow):
     label15 = Label(tab2, state=sow1, disabledforeground="gray50", text="Érték")
     label15.grid(row=8, column=1)
 
+    def com2b():
+        options.valuedisplay = var2b.get()
+        if not options.valuedisplay:
+            options.colorvaluebrick = options.colornormalbrick
+
+    var2b = BooleanVar()
+    var2b.set(options.valuedisplay)
+    checkb2b = Checkbutton(tab2, state=sow1, disabledforeground="gray50", variable=var2b, command=com2b)
+    checkb2b.grid(row=8, column=4, sticky=W)
+
+    CreateToolTip(checkb2b, "Legyenek-e megjelenítve a pontértékek?")
+
+
     button15 = Button(tab2, state=sow1, width=buttonwidth, bg=options.colorvaluebrick,
                       activebackground=options.colorvaluebrick)
     button15.configure(command=lambda button=button15, color="colorvaluebrick": changecolor1(button, color))
@@ -3209,6 +3799,10 @@ def setup1(sow):
         if v1.get() == 2 or v1.get() == 3:
             options.checkmode = 1
             v6.set(options.checkmode)
+            var4c.set(False)
+            options.limitedvisibility = False
+            var7a.set(False)
+            options.checkattheend = False
 
     v1 = IntVar()
     v1.set(options.gamemode)
@@ -3240,7 +3834,7 @@ def setup1(sow):
 
     lb2 = Label(f0, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
                 text=" ellenféllel szemben,")
-    lb2.grid(row=1, column=2)
+    lb2.grid(row=1, column=2, rowspan=2)
 
     rb3 = Radiobutton(f0, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
                       text="Hálózaton játszom,", variable=v1, value=3, command=com21)
@@ -3272,7 +3866,7 @@ def setup1(sow):
     var114.set(options.duplicate)
     checkb114 = Checkbutton(f0, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
                             text=" szimultán,", variable=var114, command=com114)
-    checkb114.grid(row=1, column=3, sticky=W)
+    checkb114.grid(row=1, column=3, rowspan=2, sticky=W)
 
     CreateToolTip(checkb114,
                   "A játékosok akciója lehet egymás utáni vagy egyidejű (duplicate mód)\n" +
@@ -3293,7 +3887,7 @@ def setup1(sow):
     var115.set(options.independentboards)
     checkb115 = Checkbutton(f0, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
                             text=" külön táblán.", variable=var115, command=com115)
-    checkb115.grid(row=1, column=4, sticky=W)
+    checkb115.grid(row=1, column=4, rowspan=2, sticky=W)
 
     CreateToolTip(checkb115,
                   "A játék történhet közös táblán vagy egymástól\nfüggetlen, csak az adott játékos által láthatón.\n" +
@@ -3437,20 +4031,23 @@ def setup1(sow):
 
     CreateToolTip(checkb3a, "Ha a táblán vannak előre beírt betűk, akkor ne legyen bejelölve")
 
+    ffs = Frame(f1)
+    ffs.grid(row=6, column=3, sticky=E)
+
     var41 = StringVar()
     var41.set(abc[options.startfieldx])
-    entry1 = Entry(f1, state=sow1, disabledforeground="gray50", width=2, bg="white", relief=SUNKEN, borderwidth=2,
+    entry1 = Entry(ffs, state=sow1, disabledforeground="gray50", width=2, bg="white", relief=SUNKEN, borderwidth=2,
                    textvariable=var41, justify="right")
-    entry1.grid(row=6, column=3, sticky=E)
+    entry1.grid(row=0, column=0, sticky=E)
     entry1.bind("<KeyRelease>", com59)
 
     CreateToolTip(entry1, "Sor")
 
     var42 = StringVar()
     var42.set(options.startfieldy+1)
-    entry2 = Entry(f1, state=sow1, disabledforeground="gray50", width=2, bg="white", relief=SUNKEN, borderwidth=2,
+    entry2 = Entry(ffs, state=sow1, disabledforeground="gray50", width=2, bg="white", relief=SUNKEN, borderwidth=2,
                    textvariable=var42, justify="right")
-    entry2.grid(row=6, column=4, sticky=E)
+    entry2.grid(row=0, column=1, sticky=E)
     entry2.bind("<KeyRelease>", com59)
 
     CreateToolTip(entry2, "Oszlop")
@@ -3475,22 +4072,40 @@ def setup1(sow):
 
     CreateToolTip(entry3, "Fordulók száma")
 
-    def com13a():
-        options.changeincreasepasses = var4a.get()
+    def com13b():
+        options.changeincreasepasses = var4b.get()
 
-    var4a = BooleanVar()
-    var4a.set(options.changeincreasepasses)
-    checkb4a = Checkbutton(f1, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
-                           text="A cserék száma számítson bele a passzok számába", variable=var4a, command=com13a)
-    checkb4a.grid(row=8, column=0, sticky=W)
+    var4b = BooleanVar()
+    var4b.set(options.changeincreasepasses)
+    checkb4b = Checkbutton(f1, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
+                           text="A cserék száma számítson bele a passzok számába", variable=var4b, command=com13b)
+    checkb4b.grid(row=8, column=0, sticky=W)
 
-    CreateToolTip(checkb4a,
+    CreateToolTip(checkb4b,
                   "A cserék száma beleszámít-e a passzok számába.\nAkkor érdemes bekapcsolni, ha a " +
                   "betűkészlet végtelenítve van\nés nincs beállítva a fordulók száma sem.")
 
+    def com13c():
+        options.limitedvisibility = var4c.get()
+        if options.gamemode == 2 or options.gamemode == 3:
+            v1.set(1)
+            options.gamemode = 1
+
+    var4c = BooleanVar()
+    var4c.set(options.limitedvisibility)
+    checkb4c = Checkbutton(f1, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
+                           text="Tábla látható területének korlátozása", variable=var4c, command=com13c)
+    checkb4c.grid(row=9, column=0, sticky=W)
+
+    CreateToolTip(checkb4c,
+                  "Ha be van kapcsolva, a tartó méretére korlátozza a\n láthatóságot. Akkor érdemes bekapcsolni, ha "
+                  "a\ntábla felfedezése célja a játéknak.\n(Csak egyjátékos módban)")
+
+
+
     label18 = Label(f1, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
-                    text="Betűk")
-    label18.grid(row=9, column=0, sticky=W)
+                    text="Betűk kezelése")
+    label18.grid(row=10, column=0, sticky=W)
 
     def com22():
         options.lettersetmode = v4.get()
@@ -3515,8 +4130,8 @@ def setup1(sow):
     v4 = IntVar()
     v4.set(options.lettersetmode)
     rb4 = Radiobutton(f1, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
-                      text="Fix betűkészlet", variable=v4, value=1, command=com22)
-    rb4.grid(row=10, column=0, sticky=W)
+                      text="Adott betűkészletből, melyből a kihúzottak eltűnnek", variable=v4, value=1, command=com22)
+    rb4.grid(row=11, column=0, sticky=W)
 
     CreateToolTip(rb4,
                   "A betűk húzása egy előre meghatározott betűkészletből történik,\n" +
@@ -3532,29 +4147,44 @@ def setup1(sow):
             rec.append(bck.value)
             rec.append(bck.type)
             rec.append(bck.rate)
+            if bck.letter in letterreplacedict:
+                rec.append((',').join(letterreplacedict[bck.letter]))
+            else:
+                rec.append("")
             data.append(rec)
         letterset("letterset")
 
     button18 = Button(f1, state=sow1, text='Készlet', width=7, command=com80)
-    button18.grid(row=10, column=3)
+    button18.grid(row=11, column=3)
 
     CreateToolTip(button18, "A betűkészlet")
 
     rb5 = Radiobutton(f1, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
-                      text="Fix készlet, felhasználtak visszarakva", variable=v4, value=2, command=com22)
-    rb5.grid(row=11, column=0, sticky=W)
+                      text="Adott betűkészletből, melyben a felhasználtak pótlódnak", variable=v4, value=2, command=com22)
+    rb5.grid(row=12, column=0, sticky=W)
 
     CreateToolTip(rb5,
                   "A betűk húzása egy előre meghatározott betűkészletből történik,\n" +
                   "minden forduló után pótlódnak a zsákban a táblára került betűk")
 
     rb6 = Radiobutton(f1, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
-                      text="Fix készlet, mind visszarakva", variable=v4, value=3, command=com22)
-    rb6.grid(row=12, column=0, sticky=W)
+                      text="Adott készlet, mely nem csökken, a teljes tartó cserélődik", variable=v4, value=3, command=com22)
+    rb6.grid(row=13, column=0, sticky=W)
 
     CreateToolTip(rb6,
                   "A betűk húzása egy előre meghatározott betűkészletből történik,\n" +
                   "minden forduló után a játékos összes betűje cserélődik")
+
+    def com13a():
+        options.optimizeddraw = var4b.get()
+
+    var4b = BooleanVar()
+    var4b.set(options.optimizeddraw)
+    checkb4b = Checkbutton(f1, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
+                          text="A magánhangzók és mássalhangzók arányának befolyásolása         ", variable=var4b, command=com13a)
+    checkb4b.grid(row=14, column=0, sticky=W)
+
+    CreateToolTip(checkb4b, "A sorsolt magánhangzók+dzsókerek arányát 40-60% körül tartja")
 
     def com14():
         options.usefletters = var5.get()
@@ -3573,7 +4203,7 @@ def setup1(sow):
     var5.set(options.usefletters)
     checkb5 = Checkbutton(f1, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
                           text="Közös betűk", variable=var5, command=com14)
-    checkb5.grid(row=13, column=0, sticky=W)
+    checkb5.grid(row=15, column=0, sticky=W)
 
     CreateToolTip(checkb5, "A játék folyamán minden játékos számára\nrendelkezésre álló betűk adhatók meg")
 
@@ -3591,13 +4221,24 @@ def setup1(sow):
         letterset("fletterset")
 
     button19 = Button(f1, state=sow1, text='Készlet', width=7, command=com81)
-    button19.grid(row=13, column=3)
+    button19.grid(row=15, column=3)
 
     CreateToolTip(button19, "A közös betűk készlete")
 
+    def com14a():
+        options.resetfrack = var5a.get()
+
+    var5a = BooleanVar()
+    var5a.set(options.resetfrack)
+    checkb4b = Checkbutton(f1, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
+                          text="A közös betűk nem fogynak", variable=var5a, command=com14a)
+    checkb4b.grid(row=16, column=0, sticky=W)
+
+    CreateToolTip(checkb4b, "A kirakott betű helyén egy új jelenik meg a tartón")
+
     label19 = Label(f1, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
                     text="Betűk pontértéke")
-    label19.grid(row=14, column=0, sticky=W)
+    label19.grid(row=17, column=0, sticky=W)
 
     def com23():
         options.valuemode = v5.get()
@@ -3613,14 +4254,14 @@ def setup1(sow):
     v5 = IntVar()
     v5.set(options.valuemode)
     rb7 = Radiobutton(f1, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
-                      text="Fix pontszámok", variable=v5, value=1, command=com23)
-    rb7.grid(row=15, column=0, sticky=W)
+                      text="Adott pontszámok", variable=v5, value=1, command=com23)
+    rb7.grid(row=18, column=0, sticky=W)
 
     CreateToolTip(rb7, "A betűkészletnél meghatározott állandó pontértékek")
 
     rb8 = Radiobutton(f1, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
                       text="Véletlen pontszámok", variable=v5, value=2, command=com23)
-    rb8.grid(row=16, column=0, sticky=W)
+    rb8.grid(row=19, column=0, sticky=W)
 
     CreateToolTip(rb8, "A jobbra levő készletből sorsolt\nvéletlenszerű pontértékek")
 
@@ -3656,7 +4297,7 @@ def setup1(sow):
         popup4.wait_window(popup8)
 
     button20 = Button(f1, state=sow1, text='Készlet', width=7, command=showvalues)
-    button20.grid(row=16, column=3)
+    button20.grid(row=19, column=3)
 
     CreateToolTip(button20, "A lehetséges pontértékek készlete")
 
@@ -3670,7 +4311,7 @@ def setup1(sow):
     var6.set(options.randommultiplier)
     checkb6 = Checkbutton(f1, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
                           text="Véletlen szorzó", variable=var6, command=com15)
-    checkb6.grid(row=17, column=0, sticky=W)
+    checkb6.grid(row=20, column=0, sticky=W)
 
     CreateToolTip(checkb6, "A jobbra levő készletből sorsolt\nvéletlenszerű szorzók")
 
@@ -3705,13 +4346,13 @@ def setup1(sow):
         popup4.wait_window(popup8)
 
     button21 = Button(f1, state=sow1, text='Készlet', width=7, command=showmvalues)
-    button21.grid(row=17, column=3)
+    button21.grid(row=20, column=3)
 
     CreateToolTip(button21, "A lehetséges szorzók készlete")
 
     label20 = Label(f1, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
-                    text="Érvényesség ellenőrzése")
-    label20.grid(row=18, column=0, sticky=W)
+                    text="Szavak érvényessége")
+    label20.grid(row=21, column=0, sticky=W)
 
     def com24():
         global checkenchant
@@ -3730,28 +4371,49 @@ def setup1(sow):
     v6 = IntVar()
     v6.set(options.checkmode)
     rb9 = Radiobutton(f1, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
-                      text="Szótár alapján", variable=v6, value=1, command=com24)
-    rb9.grid(row=19, column=0, sticky=W)
+                      text="Csak ha benne van a szótárban", variable=v6, value=1, command=com24)
+    rb9.grid(row=22, column=0, sticky=W)
 
     CreateToolTip(rb9, "Az összes újonnan létrejött szó érvényességének\nellenőrzése a lépés továbbítása előtt")
 
     rb10 = Radiobutton(f1, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
-                       text="Nincs (minden játékosnak el kell fogadnia)", variable=v6, value=2, command=com24)
-    rb10.grid(row=20, column=0, sticky=W)
+                       text="Ha nincs benne a szótárban, figyelmeztetés", variable=v6, value=2, command=com24)
+    rb10.grid(row=23, column=0, sticky=W)
 
     CreateToolTip(rb10,
-                  "(Nincs megvalósítva a szavazás. Ha be van jelölve,\n minden kirakott szó érvényesnek számít." +
+                  "Ha be van jelölve,\n minden kirakott szó érvényesnek számít." +
                   " A játékost\n a program figyelmezteti, hogy a szó nincs a szótárban.)")
 
     rb11 = Radiobutton(f1, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
-                       text="Helyesírás-ellenőrző program használatával", variable=v6, value=3, command=com24)
-    rb11.grid(row=21, column=0, sticky=W)
+                       text="Helyesírás-ellenőrző program", variable=v6, value=3, command=com24)
+    rb11.grid(row=24, column=0, sticky=W)
 
     CreateToolTip(rb11, "Az összes újonnan létrejött szó érvényességének\nellenőrzése a telepített "
                         "helyesírás-ellenőrző programmal\n(Csak egyjátékos módban állítható be.)")
 
     if not enchantexist:
         rb11.configure(state="disabled", disabledforeground="grey")
+
+    def com16a():
+        options.checkattheend = var7a.get()
+        if var7a.get():
+            options.checkmode = 4
+            if options.gamemode == 2 or options.gamemode == 3:
+                v1.set(1)
+                options.gamemode = 1
+
+    var7a = BooleanVar()
+    var7a.set(options.checkattheend)
+    checkb7a = Checkbutton(f1, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
+                       text="Csak a játék végén", variable=var7a, command=com16a)
+    checkb7a.grid(row=25, column=0, sticky=W)
+
+    CreateToolTip(checkb7a, "A kirakott szavak érvényességét csak a játék végén ellenőrzi"
+                        "\n(Csak egyjátékos módban állítható be.)")
+
+    label21 = Label(f1, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
+                    text="Dzsóker kezelése")
+    label21.grid(row=26, column=0, sticky=W)
 
     def com16():
         options.dontchangejoker = var7.get()
@@ -3763,7 +4425,7 @@ def setup1(sow):
     var7.set(options.dontchangejoker)
     checkb7 = Checkbutton(f1, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
                           text="Dzsóker bármilyen betűt helyettesíthet a táblán ", variable=var7, command=com16)
-    checkb7.grid(row=22, column=0, sticky=W)
+    checkb7.grid(row=27, column=0, sticky=W)
 
     CreateToolTip(checkb7,
                   "A lerakott dzsóker a táblán is dzsóker marad,\nés bármilyen betűként felhasználható a" +
@@ -3784,11 +4446,15 @@ def setup1(sow):
     var8.set(options.valueofchangedletter)
     checkb8 = Checkbutton(f1, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
                           text="Dzsóker pontértéke is változik", variable=var8, command=com17)
-    checkb8.grid(row=23, column=0, sticky=W)
+    checkb8.grid(row=28, column=0, sticky=W)
 
     CreateToolTip(checkb8,
                   "A lerakott dzsóker a helyettesített betű\npontértékét is megkapja.\n" +
                   "Gép elleni játékban jelenleg nem állítható be.")
+
+    label22 = Label(f1, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
+                    text="Pontszámítás")
+    label22.grid(row=29, column=0, sticky=W)
 
     def com18():
         options.onedirection = var9.get()
@@ -3798,7 +4464,7 @@ def setup1(sow):
     checkb9 = Checkbutton(f1, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
                           text="Csak az utoljára lerakott betűk irányába eső szóra jár pont.     ", variable=var9,
                           command=com18)
-    checkb9.grid(row=24, column=0, sticky=W)
+    checkb9.grid(row=30, column=0, sticky=W)
 
     CreateToolTip(checkb9,
                   "A keresztező szavaknak érvényesnek kell lenniük, de pont nem jár értük.\n" +
@@ -3813,12 +4479,12 @@ def setup1(sow):
     var10 = BooleanVar()
     var10.set(options.lengthbonus)
     checkb10 = Checkbutton(f2, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
-                           text="Adott hosszúságú szavakra", variable=var10, command=com19)
+                           text="A lerakott betűk száma alapján", variable=var10, command=com19)
     checkb10.grid(row=25, column=0, sticky=W)
 
     CreateToolTip(checkb10, "A mutat gombra kattintva megváltoztathatóak a jutalmak.")
 
-    button22 = Button(f2, state=sow1, text='Mutat', width=7, command=bonuses)
+    button22 = Button(f2, state=sow1, text='Mutat', width=7, command = lambda caller="numberofplacedletters": bonuses(caller))
     button22.grid(row=25, column=3)
 
     CreateToolTip(button22, "A beállított jutalmak.")
@@ -3985,6 +4651,30 @@ def setup1(sow):
     entry7a.bind("<KeyRelease>", com59)
 
     CreateToolTip(entry7a, "A betűnkénti állandó pontszám.")
+
+    def com19a():
+        options.wordlengthbonus = var10a.get()
+        if var10a.get():
+            options.checkattheend = True
+            var7a.set(True)
+            options.checkmode = 4
+            if options.gamemode == 2 or options.gamemode == 3:
+                v1.set(1)
+                options.gamemode = 1
+
+    var10a = BooleanVar()
+    var10a.set(options.wordlengthbonus)
+    checkb10a = Checkbutton(f2, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
+                           text="A szavak hossza alapján", variable=var10a, command=com19a)
+    checkb10a.grid(row=34, column=0, sticky=W)
+
+    CreateToolTip(checkb10a, "Csak akkor állítható be, ha a szavak\nérvényességének ellenőrzése csak\na játék végén történik\nA mutat gombra kattintva megváltoztathatóak a jutalmak.")
+
+    button22a = Button(f2, state=sow1, text='Mutat', width=7, command = lambda caller="lengthofwords": bonuses(caller))
+    button22a.grid(row=34, column=3)
+
+    CreateToolTip(button22a, "A beállított jutalmak.")
+
 
     button000 = Button(tab3, width=11, text="Vissza", command=close1)
     button000.grid(row=35, column=6)
@@ -4170,6 +4860,14 @@ def letterset(caller):
                                                      parent=popup7)
                         entries[k][l7].focus()
                         return 0
+                elif l7 == 5:
+                    data[k][l7] = entries[k][l7].get().strip()
+                    content = ('').join((data[k][l7]).split(','))
+                    if not content.isalpha() and content != '':
+                        tkinter.messagebox.showerror("Hibás érték", "Csak betűket fogad a beviteli mező",
+                                                     parent=popup7)
+                        entries[k][l7].focus()
+                        return 0
         return 1
 
     def com1():
@@ -4185,8 +4883,9 @@ def letterset(caller):
         else:
             options.fletters = []
         for line1 in range(len(data)):
+            data5 = data[line1][5]  if data[line1][5] == '' else '['+data[line1][5]+']'
             letterstrl.append(data[line1][0]+','+str(data[line1][1])+','+str(data[line1][2])+','+data[line1][3]+','
-                              +str(data[line1][4]))
+                              +str(data[line1][4])+','+data5)
             if caller == "letterset":
                 bricks.append(Brick(data[line1][0]+','+str(data[line1][1])+','+str(data[line1][2])+','+
                                     data[line1][3]+','+str(data[line1][4])))
@@ -4209,13 +4908,12 @@ def letterset(caller):
                 entries[i][j].grid(row=i + 1, column=j)
                 entries[i][j].insert(END, data[i][j])
                 entries[i][j].bind("<ButtonRelease-1>", getrecordpointerindex)
-                # entries[i][j].bind("<FocusOut>", validateentry)
                 frame500.grid_columnconfigure(j, pad=pad1)
                 if i == recordpointerindex and j ==0:
                     entries[i][j].focus()
             frame500.grid_rowconfigure(i + 1, pad=pad1)
         entry500.update()
-        canvas5.config(yscrollcommand=scrollbar.set, width=len(header) * (entry500.winfo_width() + 1))
+        canvas5.config(yscrollcommand=scrollbar.set, width=len(data[0]) * (entry500.winfo_width() + 1))
 
 
     def insertrecord():
@@ -4225,7 +4923,10 @@ def letterset(caller):
         data2 = data[recordpointerindex:]
         data = []
         data.extend(data1)
-        data.append([' ', 0, 0, 'C', 0.0])
+        if len(data[0]) == 6:
+            data.append(['', 0, 0, 'C', 0.0, ''])
+        else:
+            data.append(['', 0, 0, 'C', 0.0])
         data.extend(data2)
         createentries()
         drawrecordpointer()
@@ -4233,14 +4934,17 @@ def letterset(caller):
     def newrecord():
         global recordpointerindex
         global data, entries
-        data.append([' ', 0, 0, 'C', 0.0])
-        record = [None, None, None, None, None]
+        if len(data[0]) == 6:
+            data.append(['', 0, 0, 'C', 0.0, ''])
+            record = [None, None, None, None, None, None]
+        else:
+            data.append(['', 0, 0, 'C', 0.0])
+            record = [None, None, None, None, None]
         for jj in range(len(record)):
             record[jj] = Entry(frame500, width=11, bg="white", justify=RIGHT, relief=FLAT)
             record[jj].grid(row= 100, column=jj)
             record[jj].insert(END, data[-1][jj])
             record[jj].bind("<ButtonRelease-1>", getrecordpointerindex)
-            # record[jj].bind("<FocusOut>", validateentry)
             if jj == 0:
                 record[jj].focus()
             frame500.grid_columnconfigure(jj, pad=pad1)
@@ -4284,7 +4988,7 @@ def letterset(caller):
     def conf(event):
         canvas5.configure(scrollregion=canvas5.bbox("all"))
 
-    header = ["Betű", "Darab", "Pontszám", "Típus", "Előfordulás"]
+    header = ["Betű", "Darab", "Pontszám", "Típus", "Előfordulás", "Csere"]
     recordpointerindex = 0
     popup7 = Toplevel()
     popup7.title("Betűkészlet")
@@ -4294,7 +4998,7 @@ def letterset(caller):
     frame399 = Frame(popup7, bg='#d6d6d6')
     frame399.grid(row=0, column=0, sticky=W, columnspan=4)
     entry500 = None
-    for w in range(len(header)):
+    for w in range(len(data[0])):
         var500 = StringVar()
         var500.set(header[w])
         entry500 = Entry(frame399, width=11, bg="#bebebe", justify=CENTER, textvariable=var500, relief=FLAT,
@@ -4336,7 +5040,7 @@ def letterset(caller):
     popup4.wait_window(popup7)
 
 
-def bonuses():
+def bonuses(caller):
     # Lerakott betűk száma utáni jutalom beállítása
     def com1():
         entries = [entry30, entry31, entry32, entry33, entry34, entry35, entry36, entry37, entry38]
@@ -4363,15 +5067,26 @@ def bonuses():
 
         if not validate3(entries1):
             return
-        options.twoletterbonus = int(entries1[0].get())
-        options.threeletterbonus = int(entries1[1].get())
-        options.fourletterbonus = int(entries1[2].get())
-        options.fiveletterbonus = int(entries1[3].get())
-        options.sixletterbonus = int(entries1[4].get())
-        options.sevenletterbonus = int(entries1[5].get())
-        options.eightletterbonus = int(entries1[6].get())
-        options.nineletterbonus = int(entries1[7].get())
-        options.tenletterbonus = int(entries1[8].get())
+        if caller == "numberofplacedletters":
+            options.twoletterbonus = int(entries1[0].get())
+            options.threeletterbonus = int(entries1[1].get())
+            options.fourletterbonus = int(entries1[2].get())
+            options.fiveletterbonus = int(entries1[3].get())
+            options.sixletterbonus = int(entries1[4].get())
+            options.sevenletterbonus = int(entries1[5].get())
+            options.eightletterbonus = int(entries1[6].get())
+            options.nineletterbonus = int(entries1[7].get())
+            options.tenletterbonus = int(entries1[8].get())
+        else:
+            options.wordtwoletterbonus = int(entries1[0].get())
+            options.wordthreeletterbonus = int(entries1[1].get())
+            options.wordfourletterbonus = int(entries1[2].get())
+            options.wordfiveletterbonus = int(entries1[3].get())
+            options.wordsixletterbonus = int(entries1[4].get())
+            options.wordsevenletterbonus = int(entries1[5].get())
+            options.wordeightletterbonus = int(entries1[6].get())
+            options.wordnineletterbonus = int(entries1[7].get())
+            options.wordtenletterbonus = int(entries1[8].get())
         popup7.destroy()
 
     popup7 = Toplevel()
@@ -4387,32 +5102,32 @@ def bonuses():
         i += 1
     entry30 = Entry(popup7, width=3, bg="white", justify=RIGHT, relief=FLAT)
     entry30.grid(row=1, column=1)
-    entry30.insert(END, str(options.twoletterbonus))
+    entry30.insert(END, str(options.twoletterbonus) if  caller == "numberofplacedletters" else str(options.wordtwoletterbonus))
     entry30.focus_set()
     entry31 = Entry(popup7, width=3, bg="white", justify=RIGHT, relief=FLAT)
     entry31.grid(row=2, column=1)
-    entry31.insert(END, str(options.threeletterbonus))
+    entry31.insert(END, str(options.threeletterbonus if  caller == "numberofplacedletters" else str(options.wordthreeletterbonus)))
     entry32 = Entry(popup7, width=3, bg="white", justify=RIGHT, relief=FLAT)
     entry32.grid(row=3, column=1)
-    entry32.insert(END, str(options.fourletterbonus))
+    entry32.insert(END, str(options.fourletterbonus if  caller == "numberofplacedletters" else str(options.wordfourletterbonus)))
     entry33 = Entry(popup7, width=3, bg="white", justify=RIGHT, relief=FLAT)
     entry33.grid(row=4, column=1)
-    entry33.insert(END, str(options.fiveletterbonus))
+    entry33.insert(END, str(options.fiveletterbonus if  caller == "numberofplacedletters" else str(options.wordfiveletterbonus)))
     entry34 = Entry(popup7, width=3, bg="white", justify=RIGHT, relief=FLAT)
     entry34.grid(row=5, column=1)
-    entry34.insert(END, str(options.sixletterbonus))
+    entry34.insert(END, str(options.sixletterbonus if  caller == "numberofplacedletters" else str(options.wordsixletterbonus)))
     entry35 = Entry(popup7, width=3, bg="white", justify=RIGHT, relief=FLAT)
     entry35.grid(row=6, column=1)
-    entry35.insert(END, str(options.sevenletterbonus))
+    entry35.insert(END, str(options.sevenletterbonus if  caller == "numberofplacedletters" else str(options.wordsevenletterbonus)))
     entry36 = Entry(popup7, width=3, bg="white", justify=RIGHT, relief=FLAT)
     entry36.grid(row=7, column=1)
-    entry36.insert(END, str(options.eightletterbonus))
+    entry36.insert(END, str(options.eightletterbonus if  caller == "numberofplacedletters" else str(options.wordeightletterbonus)))
     entry37 = Entry(popup7, width=3, bg="white", justify=RIGHT, relief=FLAT)
     entry37.grid(row=8, column=1)
-    entry37.insert(END, str(options.nineletterbonus))
+    entry37.insert(END, str(options.nineletterbonus if  caller == "numberofplacedletters" else str(options.wordnineletterbonus)))
     entry38 = Entry(popup7, width=3, bg="white", justify=RIGHT, relief=FLAT)
     entry38.grid(row=9, column=1)
-    entry38.insert(END, str(options.tenletterbonus))
+    entry38.insert(END, str(options.tenletterbonus if  caller == "numberofplacedletters" else str(options.wordtenletterbonus)))
     button111 = Button(popup7, text='Rendben', command=com1)
     button111.grid(row=10, column=1)
 
@@ -4432,10 +5147,14 @@ def createoreditboard(board1):
         i = 0
         j = 0
         button125 = []
+        b1 = []
+        for br in bricks:
+            b1.append(br.letter)
+        b1.extend(['?', '1', '2', '3', '4', '5', '6', '7', '8', '9'])
         while 1:
-            if j == len(bricks):
+            if j == len(b1):
                 break
-            letter = bricks[j].letter
+            letter = b1[j]
             if letter == '*':
                 j += 1
             else:
@@ -4488,6 +5207,10 @@ def createoreditboard(board1):
         flettersstr = "\n" + "\n".join(options.fletters)
         config.set('Rules', 'fletters', flettersstr)
         config.set('Rules', 'valueofchangedletter', str(options.valueofchangedletter))
+        config.set('Rules', 'limitedvisibility', str(options.limitedvisibility))
+        config.set('Rules', 'optimizeddraw', str(options.optimizeddraw))
+        config.set('Rules', 'resetfrack', str(options.resetfrack))
+        config.set('Rules', 'checkattheend', str(options.checkattheend))
         config.set('Bonuses', 'lengthbonus', str(options.lengthbonus))
         config.set('Bonuses', 'twoletterbonus', str(options.twoletterbonus))
         config.set('Bonuses', 'threeletterbonus', str(options.threeletterbonus))
@@ -4498,6 +5221,16 @@ def createoreditboard(board1):
         config.set('Bonuses', 'eightletterbonus', str(options.eightletterbonus))
         config.set('Bonuses', 'nineletterbonus', str(options.nineletterbonus))
         config.set('Bonuses', 'tenletterbonus', str(options.tenletterbonus))
+        config.set('Bonuses', 'wordlengthbonus', str(options.wordlengthbonus))
+        config.set('Bonuses', 'wordtwoletterbonus', str(options.wordtwoletterbonus))
+        config.set('Bonuses', 'wordthreeletterbonus', str(options.wordthreeletterbonus))
+        config.set('Bonuses', 'wordfourletterbonus', str(options.wordfourletterbonus))
+        config.set('Bonuses', 'worfiveletterbonus', str(options.wordfiveletterbonus))
+        config.set('Bonuses', 'wordsixletterbonus', str(options.wordsixletterbonus))
+        config.set('Bonuses', 'wordsevenletterbonus', str(options.wordsevenletterbonus))
+        config.set('Bonuses', 'wordeightletterbonus', str(options.wordeightletterbonus))
+        config.set('Bonuses', 'wordnineletterbonus', str(options.wordnineletterbonus))
+        config.set('Bonuses', 'wordtenletterbonus', str(options.wordtenletterbonus))
         config.set('Bonuses', 'oldbonusonly', str(options.oldbonusonly))
         config.set('Bonuses', 'useoldbonus', str(options.useoldbonus))
         config.set('Bonuses', 'useoldbonusvalue', str(options.useoldbonusvalue))
@@ -4616,7 +5349,7 @@ def createoreditboard(board1):
 
     menu = Menu(canvas5, tearoff=0)
     menu.add_command(label="Normál", command=lambda menu1=0: changefieldtype(menu1))
-    menu.add_command(label="Fix", command=lambda menu1=1: changefieldtype(menu1))
+    menu.add_command(label="Előre beírt", command=lambda menu1=1: changefieldtype(menu1))
     menu.add_command(label="Betűduplázó", command=lambda menu1=2: changefieldtype(menu1))
     menu.add_command(label="Betűtriplázó", command=lambda menu1=3: changefieldtype(menu1))
     menu.add_command(label="Szóduplázó", command=lambda menu1=4: changefieldtype(menu1))
@@ -4851,7 +5584,7 @@ def back():
     global rack
     for i in range(options.racksize):
         if rack[i] is not None:
-            if ontheboard(rack[i].x, rack[i].y):
+            if ontheboard(rack[i].x, rack[i].y) and len(canvas1.gettags(rack[i].objectlist[0])) == 1:
                 try:
                     canvas1.delete(rack[i].objectlist[3])
                     canvas1.delete(rack[i].objectlist[4])
@@ -4890,10 +5623,14 @@ def back():
                         rack[i].b1y = rackfields[z].b1y
                         rack[i].b2x = rackfields[z].b2x
                         rack[i].b2y = rackfields[z].b2y
+                        canvas1.addtag_withtag('racks', rack[i].objectlist[0])
+                        canvas1.addtag_withtag('racks', rack[i].objectlist[1])
+                        canvas1.addtag_withtag('racks', rack[i].objectlist[2])
+                        detectabove(rack[i])
                         break
     if options.usefletters:
         for z in range(len(frack)):
-            if ontheboard(frack[z].x, frack[z].y):
+            if ontheboard(frack[z].x, frack[z].y) and len(canvas1.gettags(frack[z].objectlist[0])) == 1:
                 try:
                     canvas1.delete(frack[z].objectlist[3])
                     canvas1.delete(frack[z].objectlist[4])
@@ -4926,11 +5663,16 @@ def back():
                                                                      text=frack[z].value)
                 canvas1.coords(frack[z].objectlist[1], frack[z].cx, frack[z].cy + 2)
                 canvas1.coords(frack[z].objectlist[2], frack[z].b1x + options.wx, frack[z].b1y + options.wy)
+                canvas1.addtag_withtag('racks', frack[z].objectlist[0])
+                canvas1.addtag_withtag('racks', frack[z].objectlist[1])
+                canvas1.addtag_withtag('racks', frack[z].objectlist[2])
+                detectabove(frack[z])
     repairboard()
 
 
 def shuffle1():
     """Tartón levő betűk keverése"""
+    global rack
     back()
     shuffle(rack)
     for i in range(options.racksize):
@@ -4943,6 +5685,10 @@ def shuffle1():
             rack[i].y = rackfields[i].y
             rack[i].cx = rackfields[i].cx
             rack[i].cy = rackfields[i].cy
+            rack[i].b1x = rackfields[i].b1x
+            rack[i].b1y = rackfields[i].b1y
+            rack[i].b2x = rackfields[i].b2x
+            rack[i].b2y = rackfields[i].b2y
 
 
 def swap():
@@ -4951,6 +5697,7 @@ def swap():
     global sack
     global requirechange
     global turns
+    global rack
     if options.gamemode == 1:
         if not options.resetsack:
             if len(wanttochange) == 0:
@@ -4991,14 +5738,7 @@ def swap():
     except Exception:
         pass
     for i in range(len(wanttochange)):
-        while 1:  # Ha a zsákból nem fogy a betű (lettersetmode 2 vagy 3), akkor nem lehet senkinek egynél több
-            # dzsókere a tartón
-            randomnumber = randrange(len(sack))
-            if options.lettersetmode != 1 and sack[randomnumber].letter == '*' and jokeronrack:
-                continue
-            break
-        if sack[randomnumber].letter == '*':
-            jokeronrack = True
+        randomnumber = drawletter(i)
         for j in range(options.racksize):
             if rack[j] == wanttochange[i]:
                 canvas1.delete(rack[j].objectlist[0])
@@ -5029,13 +5769,18 @@ def swap():
                                                                  width=1, fill=c, outline=bc, tags=str(j))
                 rack[j].objectlist[1] = canvas1.create_text(rack[j].cx, rack[j].cy + 2,
                                                             font=(options.letterfont, options.letterfontsize),
-                                                            text=rack[j].letter, tags=str(j))
+                                                            text=rack[j].letter, fill=options.colortextbrick, tags=str(j))
                 rack[j].objectlist[2] = canvas1.create_text(rack[j].b1x + options.wx, rack[j].b1y + options.wy,
                                                             font=(options.valuefont, options.valuefontsize),
-                                                            text=rack[j].value
-                                                            , tags=str(j))
+                                                            text=rack[j].value, fill=options.colorvaluebrick,
+                                                            tags=str(j))
+                if not options.valuedisplay:
+                    canvas1.itemconfig(rack[j].objectlist[2], state="hidden")
                 sack[randomnumber].used = True
                 sack.pop(randomnumber)
+                canvas1.addtag_withtag('racks', rack[j].objectlist[0])
+                canvas1.addtag_withtag('racks', rack[j].objectlist[1])
+                canvas1.addtag_withtag('racks', rack[j].objectlist[2])
     for k in range(len(wanttochange)):
         wanttochange[k].used = False
         sack.append(wanttochange[k])
@@ -5047,7 +5792,10 @@ def swap():
 def next1():
     """Lépés véglegesítése"""
     global ok1
+    global turns
     ok1 = True
+    if checktime:
+        turns-=1
     lettersontheboard()
 
 
@@ -5055,7 +5803,7 @@ def loaddictionary():
     """Szótár betöltése"""
     global dictionary
     global partsofdictionary
-    file = "szotar21a_kat.dic"
+    file = "szotar22a_kat.dic"
     abc2 = ('A', 'Á', 'B', 'C', 'CS', 'D', 'E', 'É', 'F', 'G', 'GY', 'H', 'I', 'Í', 'J', 'K', 'L', 'LY', 'M', 'N', 'NY',
            'O', 'Ó', 'Ö', 'Ő', 'P', 'Q', 'R', 'S', 'SZ', 'T', 'TY', 'U', 'Ú', 'Ü', 'Ű', 'V', 'W', 'X', 'Y', 'Z', 'ZS')
     for letter1 in abc2:
@@ -5166,6 +5914,24 @@ def createabc1():
         abc1 = abc[:]
 
 
+def assignvisiblefields(i,j):
+    racksize=options.racksize
+    for ii in range(0, racksize+1):
+        for jj in range(0, racksize-ii+1):
+            if -1 < i+ii < fieldrc and -1 < j+jj < fieldcc and  fields[i + ii][j + jj].visible == False:
+                fields[i + ii][j + jj].visible = True
+                canvas1.delete(fields[i + ii][j + jj].objectlist[0])
+            if -1 < i-ii < fieldrc and -1 < j-jj < fieldcc and  fields[i - ii][j - jj].visible == False:
+                fields[i - ii][j - jj].visible = True
+                canvas1.delete(fields[i - ii][j - jj].objectlist[0])
+            if -1 < i+ii < fieldrc and -1 < j-jj < fieldcc and  fields[i + ii][j - jj].visible == False:
+                fields[i + ii][j - jj].visible = True
+                canvas1.delete(fields[i + ii][j - jj].objectlist[0])
+            if -1 < i-ii < fieldrc and -1 < j+jj < fieldcc and  fields[i - ii][j + jj].visible == False:
+                fields[i - ii][j + jj].visible = True
+                canvas1.delete(fields[i - ii][j + jj].objectlist[0])
+
+
 def drawboard():
     """Tábla rajzolása"""
     global tabla
@@ -5173,58 +5939,83 @@ def drawboard():
     global rackfields
     global frackfields
     global firstmove
+    global image11, image12, image13, image14, image15, image16
+    global anchorimage
+    global tray
+    global fb0, fb1, fb2, fb3, fb3a
     createabc1()
+    if options.limitedvisibility:
+        for i in range(fieldrc):
+            for j in range(fieldcc):
+                fields[i][j].visible = False
+        assignvisiblefields(options.startfieldx,options.startfieldy)
+    else:
+        for i in range(fieldrc):
+            for j in range(fieldcc):
+                fields[i][j].visible = True
+                assignvisiblefields(i,j)
     if options.numbering:
         offset = 15
     else:
         offset = 15
-    # Tábla rajzolása
-    l3 = k = 0
-    for k in range(fieldcc):
-        for l3 in range(fieldrc):
-            fields[l3][k].x = k * (options.size + options.gap) + offset
-            fields[l3][k].y = l3 * (options.size + options.gap) + offset
-            fields[l3][k].cx = fields[l3][k].x + options.size / 2 - 1
-            fields[l3][k].cy = fields[l3][k].y + options.size / 2 - 1
-            if fields[l3][k].type in options.fieldsdict:
-                szoveg = ""
-                szovegszin = options.colortext
-                bground = options.fieldsdict[fields[l3][k].type][0]
+    for j in range(fieldcc):
+        for i in range(fieldrc):
+            fields[i][j].x = j * (options.size + options.gap) + offset
+            fields[i][j].y = i * (options.size + options.gap) + offset
+            fields[i][j].cx = fields[i][j].x + options.size / 2 - 1
+            fields[i][j].cy = fields[i][j].y + options.size / 2 - 1
+            if fields[i][j].type in options.fieldsdict:
+                if len(fields[i][j].type) == 1 and fields[i][j].type.isdigit():
+                    lettertext = fields[i][j].type
+                    fsize = options.valuefontsize
+                else:
+                    lettertext = ""
+                    fsize= options.fixletterfontsize
+                lettertextcolor = options.colortext
+                bground = options.fieldsdict[fields[i][j].type][0]
             else:
-                szoveg = fields[l3][k].type
-                szovegszin = options.colortext
+                lettertext = fields[i][j].type
+                fsize = options.fixletterfontsize
+                lettertextcolor = options.colortext
                 bground = options.colorfix
             if options.fborder:
                 fc = options.colorborder
             else:
                 fc = bground
-            fields[l3][k].f1x = fields[l3][k].x + (options.size - options.fieldsize) / 2
-            fields[l3][k].f1y = fields[l3][k].y + (options.size - options.fieldsize) / 2
-            fields[l3][k].f2x = fields[l3][k].x + (options.size - options.fieldsize) / 2 + options.fieldsize - 1
-            fields[l3][k].f2y = fields[l3][k].y + (options.size - options.fieldsize) / 2 + options.fieldsize - 1
-            fields[l3][k].b1x = fields[l3][k].x + (options.size - options.bricksize) / 2
-            fields[l3][k].b1y = fields[l3][k].y + (options.size - options.bricksize) / 2
-            fields[l3][k].b2x = fields[l3][k].x + (options.size - options.bricksize) / 2 + options.bricksize - 1
-            fields[l3][k].b2y = fields[l3][k].y + (options.size - options.bricksize) / 2 + options.bricksize - 1
-            canvas1.create_rectangle(fields[l3][k].f1x, fields[l3][k].f1y, fields[l3][k].f2x, fields[l3][k].f2y,
+            fields[i][j].f1x = fields[i][j].x + (options.size - options.fieldsize) / 2
+            fields[i][j].f1y = fields[i][j].y + (options.size - options.fieldsize) / 2
+            fields[i][j].f2x = fields[i][j].x + (options.size - options.fieldsize) / 2 + options.fieldsize - 1
+            fields[i][j].f2y = fields[i][j].y + (options.size - options.fieldsize) / 2 + options.fieldsize - 1
+            fields[i][j].b1x = fields[i][j].x + (options.size - options.bricksize) / 2
+            fields[i][j].b1y = fields[i][j].y + (options.size - options.bricksize) / 2
+            fields[i][j].b2x = fields[i][j].x + (options.size - options.bricksize) / 2 + options.bricksize - 1
+            fields[i][j].b2y = fields[i][j].y + (options.size - options.bricksize) / 2 + options.bricksize - 1
+            o1 = canvas1.create_rectangle(fields[i][j].f1x, fields[i][j].f1y, fields[i][j].f2x, fields[i][j].f2y,
                                      width=1, fill=bground, outline=fc)
-            canvas1.create_text(fields[l3][k].cx, fields[l3][k].cy + 2,
-                                font=(options.fixletterfont, options.fixletterfontsize), text=szoveg, fill=szovegszin)
+            if len(lettertext) == 1 and lettertext.isdigit():
+                o1a = canvas1.create_oval(fields[i][j].f1x+options.size/4, fields[i][j].f1y+options.size/4,
+                                    fields[i][j].f2x-options.size/4, fields[i][j].f2y-options.size/4,
+                                    width=1, fill="white", outline=fc)
+            o2 = canvas1.create_text(fields[i][j].cx, fields[i][j].cy + 2,
+                                font=(options.fixletterfont, fsize), text=lettertext, fill=lettertextcolor)
+            if options.limitedvisibility and not fields[i][j].visible:
+                fields[i][j].objectlist[0] = canvas1.create_rectangle(fields[i][j].f1x, fields[i][j].f1y,
+                                                                       fields[i][j].f2x, fields[i][j].f2y,
+                                                                       width=1, fill="gray", outline="gray")
             if options.numbering:
-                if l3 == 0:
-                    canvas1.create_text(fields[l3][k].cx, 3, font=(options.fixletterfont, 8), text=str(k + 1),
-                                        fill=szovegszin)
-                if k == 0:
-                    canvas1.create_text(3, fields[l3][k].cy, font=(options.fixletterfont, 8), text=abc1[l3],
-                                        fill=szovegszin)
-                if l3 == fieldrc - 1:
-                    canvas1.create_text(fields[l3][k].cx, fields[l3][k].y + options.size + 5,
-                                        font=(options.fixletterfont, 8), text=str(k + 1), fill=szovegszin)
-                if k == fieldcc - 1:
-                    canvas1.create_text(fields[l3][k].x + options.size + 7, fields[l3][k].cy,
-                                        font=(options.fixletterfont, 8), text=abc1[l3], fill=szovegszin)
-
-    tabla = Part(0, 0, fields[l3][k].x + (options.size - 1), fields[l3][k].y + (options.size - 1))
+                if i == 0:
+                    o3 = canvas1.create_text(fields[i][j].cx, 3, font=(options.fixletterfont, 8), text=str(j + 1),
+                                        fill=lettertextcolor)
+                if j == 0:
+                    o4 = canvas1.create_text(3, fields[i][j].cy, font=(options.fixletterfont, 8), text=abc1[i],
+                                        fill=lettertextcolor)
+                if i == fieldrc - 1:
+                    o5 = canvas1.create_text(fields[i][j].cx, fields[i][j].y + options.size + 5,
+                                        font=(options.fixletterfont, 8), text=str(j + 1), fill=lettertextcolor)
+                if j == fieldcc - 1:
+                    o6 = canvas1.create_text(fields[i][j].x + options.size + 7, fields[i][j].cy,
+                                        font=(options.fixletterfont, 8), text=abc1[i], fill=lettertextcolor)
+    tabla = Part(0, 0, fields[i][j].x + (options.size - 1), fields[i][j].y + (options.size - 1))
     found = False
     for i in range(fieldrc):  # Ha az első lépés előtt már vannak betűk a táblán, és kötelező a kapcsolódás
         for j in range(fieldcc):
@@ -5244,43 +6035,106 @@ def drawboard():
                             fields[options.startfieldx][options.startfieldy].y + 1,
                             fields[options.startfieldx][options.startfieldy].x + 1,
                             fields[options.startfieldx][options.startfieldy].y + (options.size - 1), fill="black")
-    z = l3 + 1.5
+    z = fieldrc + 0.5
+    if options.racksize > len(options.fletters):
+        w = options.racksize
+    else:
+        if options.usefletters:
+            w = len(options.fletters)
+        else:
+            w = options.racksize
+    if options.usefletters:
+        hm = 1.5
+    else:
+        hm = 0.5
+    while 1:
+        if appwin.winfo_height() < (z + hm) * (options.size + options.gap) + offset +70:
+            z-=1
+        else:
+            break
+    tray = canvas1.create_rectangle(offset - 5, z * (options.size + options.gap) + offset - 5,
+                                    w * (options.size + options.gap) + 35,
+                                    (z + hm) * (options.size + options.gap) + offset +70 , width=1, fill="#bebebe",
+                                    outline="yellow")
+    dashboardframe = Frame(canvas1)
+    dashboardwindow = canvas1.create_window(canvas1.bbox(tray)[0]+5, canvas1.bbox(tray)[3]-35, anchor=NW, window=dashboardframe)
+    image12 = tkinter.PhotoImage(file="back_icon.gif")
+    fb0 = Button(dashboardframe, state="disabled", image=image12, command=back)
+    fb0.grid(row=0, column=0, sticky=E + W)
+
+    CreateToolTip(fb0, "Vissza\nAz összes táblára került, de\nmég nem véglegesített betű visszavétele.")
+
+    image13 = tkinter.PhotoImage(file="shuffle_icon.gif")
+    fb1 = Button(dashboardframe, state="disabled", image=image13, command=shuffle1)
+    fb1.grid(row=0, column=1, sticky=E + W)
+
+    CreateToolTip(fb1, "Keverés\nA betűk véletlenszerű átrendezése.")
+
+    image14 = tkinter.PhotoImage(file="swap_icon.gif")
+    fb2 = Button(dashboardframe, state="disabled", image=image14, command=swap)
+    fb2.grid(row=0, column=2, sticky=E + W)
+
+    CreateToolTip(fb2, "Csere\nAz egér jobb gombjával kijelölt betűk, vagy a teljes tartó cseréje.")
+
+    image15 = tkinter.PhotoImage(file="ok_icon.gif")
+    fb3 = Button(dashboardframe, state="disabled", image=image15, command=next1)
+    fb3.grid(row=0, column=3, sticky=E + W)
+
+    CreateToolTip(fb3,
+                  "Rendben\nA fordulóban táblára került betűk véglegesítése. Szimultán játékban\nelküldi a szervernek," +
+                  " de az idő lejártáig újabbak rakhatók ki.")
+
+    image16 = tkinter.PhotoImage(file="next_icon.gif")
+    fb3a = Button(dashboardframe, state="disabled", image=image16, command=complete)
+    fb3a.grid(row=0, column=4, sticky=E + W)
+
+    CreateToolTip(fb3a, "Végleges\nSzimultán játékban a lépés idő előtti\nvéglegesítésére szolgál.")
+
+    canvas1.addtag_withtag('racks', dashboardwindow)
+    canvas1.addtag_withtag('racks', tray)
     # Rack rajzolása:
     bground = options.colornormal
     if options.fborder:
         fc = options.colorborder
     else:
         fc = bground
-    for m in range(options.racksize):
-        rackfields[m] = Field(".", 0, z, m)
-        rackfields[m].x = m * (options.size + options.gap) + offset
-        rackfields[m].y = z * (options.size + options.gap) + offset
-        rackfields[m].cx = rackfields[m].x + options.size / 2 - 1
-        rackfields[m].cy = rackfields[m].y + options.size / 2 - 1
-        rackfields[m].b1x = rackfields[m].x + (options.size - options.bricksize) / 2
-        rackfields[m].b1y = rackfields[m].y + (options.size - options.bricksize) / 2
-        rackfields[m].b2x = rackfields[m].x + (options.size - options.bricksize) / 2 + options.bricksize - 1
-        rackfields[m].b2y = rackfields[m].y + (options.size - options.bricksize) / 2 + options.bricksize - 1
-        canvas1.create_rectangle(rackfields[m].b1x, rackfields[m].b1y, rackfields[m].b2x, rackfields[m].b2y, width=1,
-                                 fill=bground, outline=fc)
+    for i in range(options.racksize):
+        rackfields[i] = Field(".", 0, z, i)
+        rackfields[i].x = i * (options.size + options.gap) + offset
+        rackfields[i].y = z * (options.size + options.gap) + offset
+        rackfields[i].cx = rackfields[i].x + options.size / 2 - 1
+        rackfields[i].cy = rackfields[i].y + options.size / 2 - 1
+        rackfields[i].b1x = rackfields[i].x + (options.size - options.bricksize) / 2
+        rackfields[i].b1y = rackfields[i].y + (options.size - options.bricksize) / 2
+        rackfields[i].b2x = rackfields[i].x + (options.size - options.bricksize) / 2 + options.bricksize - 1
+        rackfields[i].b2y = rackfields[i].y + (options.size - options.bricksize) / 2 + options.bricksize - 1
+        rackfields[i].objectlist[0]= canvas1.create_rectangle(rackfields[i].b1x, rackfields[i].b1y, rackfields[i].b2x,
+                                                              rackfields[i].b2y, width=1, fill=bground, outline=fc)
+        canvas1.addtag_withtag('racks', rackfields[i].objectlist[0])
+    image11 = tkinter.PhotoImage(file="anchor.gif")
+    anchorimage = canvas1.create_image(rackfields[i].b2x+5 , rackfields[i].b1y, anchor=NW, image=image11)
+    canvas1.addtag_withtag('racks', anchorimage)
     # Rack1 rajzolása:
     if options.usefletters:
         frackfields = [0] * len(options.fletters)
-        for n in range(len(options.fletters)):
-            frackfields[n] = Field(".", 0, z + 2, n)
-            frackfields[n].x = n * (options.size + options.gap) + offset
-            frackfields[n].y = (z + 1.5) * (options.size + options.gap) + offset
-            frackfields[n].cx = frackfields[n].x + options.size / 2 - 1
-            frackfields[n].cy = frackfields[n].y + options.size / 2 - 1
-            frackfields[n].b1x = frackfields[n].x + (options.size - options.bricksize) / 2
-            frackfields[n].b1y = frackfields[n].y + (options.size - options.bricksize) / 2
-            frackfields[n].b2x = frackfields[n].x + (options.size - options.bricksize) / 2 + options.bricksize - 1
-            frackfields[n].b2y = frackfields[n].y + (options.size - options.bricksize) / 2 + options.bricksize - 1
-            canvas1.create_rectangle(frackfields[n].b1x, frackfields[n].b1y, frackfields[n].b2x, frackfields[n].b2y,
-                                     width=1, fill=bground, outline=fc)
-            canvas1.create_text(frackfields[n].cx, frackfields[n].cy + 2,
-                                font=(options.letterfont, options.letterfontsize),
-                                text=options.fletters[n].split(',')[0], fill="#bebebe")
+        for i in range(len(options.fletters)):
+            frackfields[i] = Field(".", 0, z + 2, i)
+            frackfields[i].x = i * (options.size + options.gap) + offset
+            frackfields[i].y = (z+hm) * (options.size + options.gap) + offset
+            frackfields[i].cx = frackfields[i].x + options.size / 2 - 1
+            frackfields[i].cy = frackfields[i].y + options.size / 2 - 1
+            frackfields[i].b1x = frackfields[i].x + (options.size - options.bricksize) / 2
+            frackfields[i].b1y = frackfields[i].y + (options.size - options.bricksize) / 2
+            frackfields[i].b2x = frackfields[i].x + (options.size - options.bricksize) / 2 + options.bricksize - 1
+            frackfields[i].b2y = frackfields[i].y + (options.size - options.bricksize) / 2 + options.bricksize - 1
+            frackfields[i].objectlist[0] = canvas1.create_rectangle(frackfields[i].b1x, frackfields[i].b1y,
+                                                                   frackfields[i].b2x, frackfields[i].b2y,
+                                                                   width=1, fill=bground, outline=fc)
+            frackfields[i].objectlist[1] = canvas1.create_text(frackfields[i].cx, frackfields[i].cy + 2,
+                                                               font=(options.letterfont, options.letterfontsize),
+                                                               text=options.fletters[i].split(',')[0], fill="#bebebe")
+            canvas1.addtag_withtag('racks', frackfields[i].objectlist[0])
+            canvas1.addtag_withtag('racks', frackfields[i].objectlist[1])
     canvas1.config(width=canvas1.bbox(ALL)[2]+5, height=canvas1.bbox(ALL)[3]+5)
     canvas1.config(xscrollcommand=scrollbarh1.set)
     canvas1.config(yscrollcommand=scrollbarv1.set)
@@ -5303,6 +6157,7 @@ def init1():
     global fieldrc
     global fieldcc
     global board
+    global boardoriginal
     global sack, sack1, sackl
     global bricks
     global fields, fieldstemp
@@ -5337,7 +6192,6 @@ def init1():
     global timeractive
     global requirechange
     global notyourgame
-    global turns
     global th_E, th_R
     global servproc
     global aiclientprocl
@@ -5346,6 +6200,7 @@ def init1():
     global recordpointerindex
     global data
     global entries
+    global letterreplacedict
     recordpointerindex = 0
     data = []
     entries= []
@@ -5367,6 +6222,7 @@ def init1():
     sackl = []
     sack1 = []
     board = []
+    boardoriginal = []
     fields = []
     fieldstemp = []
     rackfields = []
@@ -5377,7 +6233,6 @@ def init1():
     lettersonrack = []
     firstmove = True
     notjokerbricks = []
-    turns = 0
     ok1 = False
     players = []
     currentplayer = ""
@@ -5389,6 +6244,7 @@ def init1():
     th_R = None
     servproc = None
     aiclientprocl = []
+    letterreplacedict = dict()
     config = configparser.ConfigParser()
     config.read_file(open(options.lastopenedcfg, encoding="utf8"))
     options.racksize = int(config.get('Rules', 'racksize'))
@@ -5429,6 +6285,10 @@ def init1():
     fletters = config.get('Rules', 'fletters')
     options.fletters = fletters.splitlines()[1:]
     options.valueofchangedletter = config.getboolean('Rules', 'valueofchangedletter')
+    options.limitedvisibility = config.getboolean('Rules', 'limitedvisibility')
+    options.optimizeddraw = config.getboolean('Rules', 'optimizeddraw')
+    options.resetfrack = config.getboolean('Rules', 'resetfrack')
+    options.checkattheend = config.getboolean('Rules', 'checkattheend')
     options.lengthbonus = config.getboolean('Bonuses', 'lengthbonus')
     options.twoletterbonus = int(config.get('Bonuses', 'twoletterbonus'))
     options.threeletterbonus = int(config.get('Bonuses', 'threeletterbonus'))
@@ -5439,6 +6299,16 @@ def init1():
     options.eightletterbonus = int(config.get('Bonuses', 'eightletterbonus'))
     options.nineletterbonus = int(config.get('Bonuses', 'nineletterbonus'))
     options.tenletterbonus = int(config.get('Bonuses', 'tenletterbonus'))
+    options.wordlengthbonus = config.getboolean('Bonuses', 'wordlengthbonus')
+    options.wordtwoletterbonus = int(config.get('Bonuses', 'wordtwoletterbonus'))
+    options.wordthreeletterbonus = int(config.get('Bonuses', 'wordthreeletterbonus'))
+    options.wordfourletterbonus = int(config.get('Bonuses', 'wordfourletterbonus'))
+    options.wordfiveletterbonus = int(config.get('Bonuses', 'wordfiveletterbonus'))
+    options.wordsixletterbonus = int(config.get('Bonuses', 'wordsixletterbonus'))
+    options.wordsevenletterbonus = int(config.get('Bonuses', 'wordsevenletterbonus'))
+    options.wordeightletterbonus = int(config.get('Bonuses', 'wordeightletterbonus'))
+    options.wordnineletterbonus = int(config.get('Bonuses', 'wordnineletterbonus'))
+    options.wordtenletterbonus = int(config.get('Bonuses', 'wordtenletterbonus'))
     options.oldbonusonly = config.getboolean('Bonuses', 'oldbonusonly')
     options.useoldbonus = config.getboolean('Bonuses', 'useoldbonus')
     options.useoldbonusvalue = int(config.get('Bonuses', 'useoldbonusvalue'))
@@ -5484,28 +6354,33 @@ def init1():
         options.lettersetmode = 1
     letters = config.get('Letters', 'letters')
     letterrows = letters.splitlines()
-    r = len(letterrows)
-    d = 0
-    for b in range(1, r):
-        bricks.append('*')
-        bricks[b - 1] = Brick(letterrows[b])
-        for c in range(bricks[b - 1].count):
-            sack.append('*')
-            sack[d] = Brick(letterrows[b])
-            d += 1
+    for letterrow in letterrows:
+        if letterrow == "":
+            continue
+        bricks.append(Brick(letterrow))
+        for i in range(bricks[-1].count):
+            sack.append(Brick(letterrow))
+        try:
+            letterreplacedict[bricks[-1].letter] = letterrow.split('[')[1].strip(']').split(',')
+        except IndexError:
+            pass
     sack1 = sack[:]
-    for ii in range(len(bricks)):
-        if bricks[ii].letter != '*':
-            notjokerbricks.append(bricks[ii])
+    for brck in bricks:
+        if brck.letter != '*':
+            notjokerbricks.append(brck)
     fields1 = config.get('Board', 'board')
     fieldrows = fields1.splitlines()
-    r = len(fieldrows)
-    fieldrc = r - 1
-    fields2 = []
-    for b in range(1, r):
-        fields2 = fieldrows[b].split(' ')
-        board.append(fields2)
-    fieldcc = len(fields2)
+    fieldrc = len(fieldrows) - 1
+    for fieldrow in fieldrows:
+        if fieldrow == "":
+            continue
+        fieldrowl = fieldrow.split(' ')
+        boardoriginal.append(fieldrowl[:])
+        for i in range(len(fieldrowl)):
+            if fieldrowl[i] == '?':
+                 fieldrowl[i] = sack[randrange(len(sack))].letter
+        board.append(fieldrowl)
+    fieldcc = len(fieldrow.split(' '))
     fields = []
     for i in range(fieldrc):
         fields.append(["."] * fieldcc)
@@ -5571,18 +6446,14 @@ def init2():
     notjokerbricks = []
     turns = 0
     ok1 = False
-    bricks = []
-    for i in range(len(sack)):
-        found = False
-        for j in range(len(bricks)):
-            if sack[i].letter == bricks[j].letter:
-                found = True
-                break
-        if not found:
-            bricks.append(sack[i])
-    for ii in range(len(bricks)):
-        if bricks[ii].letter != '*':
-            notjokerbricks.append(bricks[ii])
+    if options.gamemode == 1:
+        sack = []
+        for brck in bricks:
+            for i in range(brck.count):
+               sack.append(Brick(brck.letter+","+str(brck.count)+","+str(brck.value)+","+brck.type+","+str(brck.rate)))
+            if brck.letter != '*':
+               notjokerbricks.append(brck)
+        sack1 = sack[:]
     for i in range(fieldrc):
         fields.append(["."] * fieldcc)
     for i in range(fieldrc):
@@ -5644,74 +6515,11 @@ def bind2():
     canvas1.bind("<Shift-Button-5>", mouse_wheelh_canvas)
 
 
-def help1():
-    helppopup = Toplevel(appwin)
-    sct = tkinter.scrolledtext.ScrolledText(master=helppopup)
-    sct.pack()
-    sct.insert("1.0", "\n   CSISZA -  mn. mely csak öszvetételekben használtatik,\n"
-                      "   s am. csiszoló.\n"
-                      "   (A magyar nyelv szótára - Czuczor Gergely, Fogarasi János)\n\n\n"               
-                      "\n                        Kezelési útmutató\n\n\n"
-                      "   Játéktér\n\n"
-                      "   betű elhelyezése: egér bal gombjának nyomva tartása + húzás\n"
-                      "   betű visszarakása a tartóra: kattintás az egér jobb gombjával\n"
-                      "   betű cserére jelölése: kattintás az egér jobb gombjával\n"
-                      "   függőleges mozgatás: egérgörgő\n"
-                      "   vízszintes mozgatás: shift + egérgörgő\n\n\n"
-                      "   Új játék indítása\n\n"
-                      "   A Fájl menü Új  játék menüpontjával kezdeményezhető. A megjelenő\n"
-                      "   fájlválasztó ablakban van lehetőség a meglevő .cfg kiterjesztésű\n"
-                      "   kész játékkonfigurációk közül kiválasztani a kívántat. A Megnyitás\n"
-                      "   gomb megnyomásakor a játék betöltődik. Az Indítás gomb segítségével\n"
-                      "   belekezdhetünk közvetlenül egy egyszemélyes játékba, vagy a Beállítások\n"
-                      "   menüponttal elérhetőek a játékszabályokhoz tartozó egyes opciók,\n"
-                      "   választható gép elleni játék.\n\n\n"
-                      "   Kész játék módosítása, új játék készítése\n\n"
-                      "   Egy játék betöltése után, a Beállítások menüponttal aktivált jegyzettömb\n"
-                      "   Tábla füléhez tartozó lapon található Szerkesztés gomb megnyomása\n"
-                      "   lehetőséget ad a betöltött játékhoz tartozó tábla szerkesztésére.\n"
-                      "   A megváltoztatni kívánt mezőbe kell az egér jobb oldali gombjával kattintani\n"
-                      "   a lehetőségeket listázó menü eléréséhez. Rendben gomb megnyomására a\n"
-                      "   változtatásokat a kiválasztott .cfg fájlba menti a program. Ha a játék egyéb\n"
-                      "   jellemzőit is szeretnénk megváltoztatni, akkor azok fájlba mentése is ezen az\n"
-                      "   úton kivitelezhető. Szerkesztés helyett az Új tábla gombbal kezdeményezhető\n"
-                      "   egy az aktuálistól eltérő méretű tábla kialakítása.\n")
-    sct.configure(state=DISABLED)
-    title = "Kezelési útmutató"
-    startpos = sct.search(title, "1.0", stopindex=END)
-    endpos = '%s+%dc' % (startpos, (len(title)))
-    sct.tag_add("title", startpos, endpos)
-    sct.tag_config("title", font=(False, 20))
-    subtitles = ["Játéktér",  "Új játék indítása", "Kész játék módosítása, új játék készítése"]
-    for subt in subtitles:
-        idx = "1.0"
-        while 1:
-            startpos = sct.search(subt ,idx , stopindex=END)
-            if not startpos:
-                break
-            endpos = '%s+%dc' % (startpos, (len(subt)))
-            idx = endpos
-            sct.tag_add("subtitles", startpos , endpos)
-            sct.tag_config("subtitles", font = (False,15))
-    menutexts = ["Fájl", "Új  játék", "Indítás", "Új tábla", "Megnyitás", "Beállítások", "Rendben", "Szerkesztés",
-                 "Tábla"]
-    for wo in menutexts:
-        idx = "1.0"
-        while 1:
-            startpos = sct.search(wo ,idx , stopindex=END)
-            if not startpos:
-                break
-            endpos = '%s+%dc' % (startpos, (len(wo)))
-            idx = endpos
-            sct.tag_add("highlight", startpos , endpos)
-            sct.tag_config("highlight", background='yellow')
-
-
 def about1():
     aboutpopup = Toplevel(appwin)
-    sct = tkinter.scrolledtext.ScrolledText(master=aboutpopup)
+    sct = tkinter.scrolledtext.ScrolledText(master=aboutpopup, font=(options.letterfont, 19), background="white")
     sct.pack()
-    sct.insert("1.0", "\n                           CsiSza v0.21\n\n\n"
+    sct.insert("1.0", "\n                                              CsiSza v0.3\n\n\n"
                       
                       "   Saját szórakoztatásomra készítettem ezt a programot, de úgy\n"
                       "   gondolom, hogy mások számára is hasznos lehet. A GPLv3 licensz\n"
@@ -5774,7 +6582,7 @@ configm.add_command(label="Beállítások", activebackground="#9acd32", command=
 menubar.add_cascade(label="Beállítások", menu=configm)
 
 helpm = Menu(menubar, tearoff=0)
-helpm.add_command(label="Kezelés", activebackground="#9acd32", command=help1)
+helpm.add_command(label="Kezelés", activebackground="#9acd32", command=lambda : manual.help1(appwin, options))
 helpm.add_command(label="Program", activebackground="#9acd32", command=about1)
 menubar.add_cascade(label="Segítség", menu=helpm)
 
@@ -5799,8 +6607,8 @@ frame0.bind("<Configure>", conf0)
 bind2()
 
 def conf10a(event):
-    canvas10b.configure(height=frame0.winfo_height())
-    pb1.configure(length=frame0.winfo_height())
+    canvas10b.configure(height=frame0.winfo_height())  #frame0
+    pb1.configure(length=frame0.winfo_height())        #frame0
 
 
 frame10b = Frame(frame1, borderwidth=1, bg='#d6d6d6')
@@ -5850,8 +6658,8 @@ button6.configure(state="disabled")
 CreateToolTip(button6, "Szünet/Folytatás")
 
 frame99.grid_columnconfigure(1, pad=pad1)
-for i in range(4):
-    frame99.grid_rowconfigure(i, pad=pad1)
+for rown in range(4):
+    frame99.grid_rowconfigure(rown, pad=pad1)
 
 Frame(frame99, width=110, height=30, bg='#d6d6d6').grid(row=8, column=1)
 
@@ -6008,7 +6816,7 @@ CreateToolTip(button1, "A betűk véletlenszerű átrendezése.")
 button2 = Button(frame12, state="disabled", width=10, bg='#d6d6d6', text="Csere", command=swap)
 button2.grid(row=3, column=0, sticky=E + W)
 
-CreateToolTip(button2, "Az egér jobb gombjával kijelölt betűk cseréje.")
+CreateToolTip(button2, "Az egér jobb gombjával kijelölt betűk, vagy a teljes tartó cseréje.")
 
 button3 = Button(frame12, state="disabled", width=10, bg='#d6d6d6', text="Rendben", command=next1)
 button3.grid(row=4, column=0, sticky=E + W)
@@ -6018,8 +6826,8 @@ CreateToolTip(button3,
               " de az idő lejártáig újabbak rakhatók ki.")
 
 frame12.grid_columnconfigure(0, pad=pad1)
-for i in range(4):
-    frame12.grid_rowconfigure(i, pad=pad1)
+for rown in range(4):
+    frame12.grid_rowconfigure(rown, pad=pad1)
 
 Frame(frame12, width=30, bg='#d6d6d6').grid(row=1, column=2)
 

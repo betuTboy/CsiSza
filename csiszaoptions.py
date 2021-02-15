@@ -14,6 +14,7 @@ class Options:
         self.port = "40000"
         self.duplicate = False
         self.independentboards = False                 # szükséges: duplicate, kizárt: csere
+        self.limitedvisibility = False
 
         self.racksize = 10
         self.size = 27
@@ -21,6 +22,7 @@ class Options:
         self.gap = 2
         self.letterfont = None
         self.letterfontsize = 15
+        self.valuedisplay = True
         self.valuefont = None
         self.valuefontsize = 7
         self.fixletterfont = None
@@ -75,6 +77,17 @@ class Options:
         self.eightletterbonus = 60
         self.nineletterbonus = 60
         self.tenletterbonus = 60
+        # A kirakott szavak hossza után járó jutalom:        #szükséges: checkattheend
+        self.wordlengthbonus = False
+        self.wordtwoletterbonus = 0
+        self.wordthreeletterbonus = 0
+        self.wordfourletterbonus = 0
+        self.wordfiveletterbonus = 0
+        self.wordsixletterbonus = 0
+        self.wordsevenletterbonus = 0
+        self.wordeightletterbonus = 2
+        self.wordnineletterbonus = 2
+        self.wordtenletterbonus = 2
         # A táblán levő betűk felhasználásáért jár-e jutalom, és csak az jár, vagy a saját értékük is:
         self.oldbonusonly = False
         self.useoldbonus = False
@@ -97,7 +110,9 @@ class Options:
             self.lettersetmode = 3
         else:
             self.lettersetmode = 1
-            # A betűk értéke véletlenszám:
+        #A magánhangzók+dzsókerek arányát befolyásolja
+        self.optimizeddraw = False
+        # A betűk értéke véletlenszám:
         self.randomlettervalue = False
         if self.randomlettervalue:
             self.valuemode = 2
@@ -114,6 +129,8 @@ class Options:
             self.checkmode = 1
         else:
             self.checkmode = 2
+        #Ellenőrzés csak a játék végén
+        self.checkattheend = False
         # Lerakott dzsóker a táblán is dzsóker marad:
         self.dontchangejoker = False
         # Csak a lerakott betűk irányában kialakult szóra jár pont, a keresztező szavakra nem:
@@ -121,6 +138,7 @@ class Options:
         # Fix betűk:
         self.usefletters = False                    # kizárt: duplicate
         self.fletters = []
+        self.resetfrack = False
         # Dzsókerek értéke:
         self.valueofchangedletter = False           # kizárt: dontchangejoker, gamemode=2, 3
 
@@ -157,4 +175,9 @@ class Options:
         """Mezők viselkedése (szín, megjelenítendő-e a szövege, írható-e)"""
         self.fieldsdict = {".": [self.colornormal, 0, 1], "2L": [self.colordoubleL, 0, 1],
                            "3L": [self.colortripleL, 0, 1], "2W": [self.colordoubleW, 0, 1],
-                           "3W": [self.colortripleW, 0, 1], "!": [self.colorwall, 0, 0]}
+                           "3W": [self.colortripleW, 0, 1], "!": [self.colorwall, 0, 0],
+                           "1": [self.colornormal, 0, 1], "2": [self.colornormal, 0, 1],
+                           "3": [self.colornormal, 0, 1], "4": [self.colornormal, 0, 1],
+                           "5": [self.colornormal, 0, 1], "6": [self.colornormal, 0, 1],
+                           "7": [self.colornormal, 0, 1], "8": [self.colornormal, 0, 1],
+                           "9": [self.colornormal, 0, 1]}
