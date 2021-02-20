@@ -167,8 +167,8 @@ def help1(appwin, options):
                       "      jelentősége.\n\n"
                       "      Az Előfordulás oszlop jelenleg nincs használatban.\n\n"
                       "      A Csere oszlopban megadott betűkre cserélhető a Betű oszlopban megadott\n"
-                      "      karakter, ha a táblára kerül.\n"
-                      "      A magánhangzók és mássalhangzók számának befolyásolása\n\n"
+                      "      karakter, ha a táblára kerül.\n\n"
+                      "A magánhangzók és mássalhangzók számának befolyásolása\n\n"
                       "      Ha be van állítva, akkor a program igyekszik a játékosok tartóján lévő\n"
                       "      magánhangzók+dzsókerek és mássalhangzók arányát javítani.\n\n"
                       "Közös betűk\n\n"
@@ -444,23 +444,23 @@ def help1(appwin, options):
                    ["./manual/colour.gif", ["104.0"]],
                    ["./manual/configurebrick.gif", ["114.0"]], ["./manual/configuregame.gif", ["131.0"]],
                    ["./manual/configureletterset.gif", ["200.0"]],
-                   ["./manual/bonuses.gif", ["268.0"]], ["./manual/configureaiplayers.gif", ["306.0"]],
-                   ["./manual/tray.gif", ["397.0"]], ["./manual/game0.gif", ["422.0"]],
-                   ["./manual/game1.gif", ["427.0"]], ["./manual/game2.gif", ["433.0"]],
-                   ["./manual/game3.gif", ["437.0"]], ["./manual/game4.gif", ["443.0"]],
-                   ["./manual/game5.gif", ["449.0"]],
-                   ["./manual/game6.gif", ["455.0"]], ["./manual/game7.gif", ["461.0"]],
-                   ["./manual/game8.gif", ["463.0"]], ["./manual/newboard0.gif", ["479.0"]],
-                   ["./manual/newboard1.gif", ["484.0"]], ["./manual/newboard2.gif", ["487.0"]],
-                   ["./manual/newboard3.gif", ["493.0"]], ["./manual/newboard4.gif", ["502.0"]],
-                   ["./manual/newboard5.gif", ["505.0"]], ["./manual/newboard6.gif", ["513.0"]],
-                   ["./manual/newboard7.gif", ["530.0"]], ["./manual/newboard8.gif", ["537.0"]],
-                   ["./manual/newboard9.gif", ["545.0"]], ["./manual/checkbox.gif",
+                   ["./manual/bonuses.gif", ["269.0"]], ["./manual/configureaiplayers.gif", ["307.0"]],
+                   ["./manual/tray.gif", ["398.0"]], ["./manual/game0.gif", ["423.0"]],
+                   ["./manual/game1.gif", ["428.0"]], ["./manual/game2.gif", ["434.0"]],
+                   ["./manual/game3.gif", ["438.0"]], ["./manual/game4.gif", ["444.0"]],
+                   ["./manual/game5.gif", ["450.0"]],
+                   ["./manual/game6.gif", ["456.0"]], ["./manual/game7.gif", ["462.0"]],
+                   ["./manual/game8.gif", ["464.0"]], ["./manual/newboard0.gif", ["480.0"]],
+                   ["./manual/newboard1.gif", ["485.0"]], ["./manual/newboard2.gif", ["488.0"]],
+                   ["./manual/newboard3.gif", ["494.0"]], ["./manual/newboard4.gif", ["503.0"]],
+                   ["./manual/newboard5.gif", ["506.0"]], ["./manual/newboard6.gif", ["514.0"]],
+                   ["./manual/newboard7.gif", ["531.0"]], ["./manual/newboard8.gif", ["538.0"]],
+                   ["./manual/newboard9.gif", ["546.0"]], ["./manual/checkbox.gif",
                                                            ["154.0", "162.0", "168.0", "173.0", "180.0", "185.0",
-                                                            "215.0", "223.0", "232.0", "245.0",
-                                                            "251.0", "256.0", "261.0", "269.0", "273.0", "278.0",
-                                                            "283.0", "287.0", "293.0", "298.0"]],
-                   ["./manual/radiobutton.gif", ["132.0", "193.0", "228.0", "236.0"]]]
+                                                            "211.0","216.0", "224.0", "233.0", "246.0",
+                                                            "252.0", "257.0", "262.0", "270.0", "274.0", "279.0",
+                                                            "284.0", "288.0", "294.0", "299.0"]],
+                   ["./manual/radiobutton.gif", ["132.0", "193.0", "229.0", "237.0"]]]
     loadimage(imagepathes, sct)
 
 

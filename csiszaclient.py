@@ -228,7 +228,6 @@ class ThreadReception(threading.Thread):
         fl = optionslist[14].split(',')[2:]
         for i in range(len(fl) // 5):
             options.fletters.append(",".join(fl[i * 5:(i + 1) * 5]))
-        #print("fletters", options.fletters)
         options.valueofchangedletter = strtobool(optionslist[15].split(',')[1])
         options.duplicate = strtobool(optionslist[16].split(',')[1])
         options.timelimit = int(optionslist[17].split(',')[1])
@@ -447,7 +446,6 @@ class ThreadReception(threading.Thread):
             newletterss = []
             for i in newletters:
                 newletterss.append(i.letter)
-            # print("newletterss", newletterss)
             showrack(newletters)
             lockoff()
         elif rmessage == "END":
@@ -513,7 +511,6 @@ def strtoboard(messagelist):
 
 
 def boardtostr():
-    #global board
     message1 = "BOARD" + "," + str(len(board)) + "," + str(len(board[0]))
     for i in range(len(board)):
         for j in range(len(board[0])):
@@ -523,7 +520,6 @@ def boardtostr():
 
 
 def sacktostr():
-    #global sack
     global sackl
     letters1 = []
     for brck in sack:
@@ -984,7 +980,7 @@ def start():
         global servproc
         try:
             servproc = subprocess.Popen([interpreter, "csiszaserver.py"])
-            # servproc = subprocess.Popen(["./csiszaserver"])
+            #servproc = subprocess.Popen(["./csiszaserver"])
         except IOError:
             pass
 
@@ -996,7 +992,7 @@ def start():
         elif options.aidictionarylimited[i] == "40000 >":
             lim = "1"
         try:
-            # aiclientproc = subprocess.Popen("./csiszaaiclient " + str(options.aitimelimit[i]) +
+            #aiclientproc = subprocess.Popen("./csiszaaiclient " + str(options.aitimelimit[i]) +
             #                                " " + lim + " " + str(options.aistrength[i]) + " " +
             #                                " ".join(options.wordlengthlist[i]), shell=True)
             aiclientproc = subprocess.Popen(interpreter + " csiszaaiclient.py " + str(options.aitimelimit[i]) +
@@ -1319,7 +1315,6 @@ def repairboard():
         for j in range(fieldcc):
             if fields[i][j].type == "occupied":
                 fields[i][j].type = board[i][j]
-                # print("field repaired:", i, ",", j)
 
 
 def mouseldown(event):
@@ -1500,7 +1495,6 @@ def mouselrelease(event):
             canvas1.addtag_withtag('racks', selectedbrick.objectlist[0])
             canvas1.addtag_withtag('racks', selectedbrick.objectlist[1])
             canvas1.addtag_withtag('racks', selectedbrick.objectlist[2])
-
             # rack[] lista rackfields[] szerinti sorrendjének helyreállítása:
             for i in range(options.racksize):
                 if selectedbrick.x == rackfields[i].x and i != selectedbricki:
@@ -1574,10 +1568,8 @@ def updatecoords():
     global rackfields
     global frackfields
     global rack
-    #tray_xy = [canvas1.bbox(tray)[0], canvas1.bbox(tray)[1]]
     rackfields[0].x = canvas1.bbox(rackfields[0].objectlist[0])[0]
     rackfields[0].y = canvas1.bbox(rackfields[0].objectlist[0])[1]
-    #print("tray",tray_xy)
     for i in range(options.racksize):
         rackfields[i].x = rackfields[0].x + i * (options.size + options.gap)
         rackfields[i].y = rackfields[0].y
@@ -1626,7 +1618,7 @@ def mouserdown(event):
     """Jobb oldali gomb lenyomására végrehajtandó művelet"""
     appwin.x1, appwin.y1 = canvas1.canvasx(event.x), canvas1.canvasy(event.y)
     global selectedbrick
-    global selectedbricki                                                # !!!!!!!!!!!!!!!!!!!!!!!!
+    global selectedbricki
     global wanttochange
     global fields
     global rackfields
@@ -1753,6 +1745,7 @@ def ontheboard(x, y):
         return True
 
 def onthetray(x, y):
+    """Adott pont a tálcára esik-e"""
     if (canvas1.bbox(tray)[0] < x < canvas1.bbox(tray)[2]) and (canvas1.bbox(tray)[1] < y < canvas1.bbox(tray)[3]):
         return True
 
@@ -2000,7 +1993,7 @@ def swapwithserver():
 
     def listtostr(wanttochangel1):
         message11 = "CHANGE," + str(len(wanttochangel1) * 4)
-        print("wanttochange", wanttochangel1)
+        #print("wanttochange", wanttochangel1)
         for ii in range(len(wanttochangel1)):
             message11 += ","
             message11 += str(wanttochangel1[ii][0])
@@ -2105,7 +2098,7 @@ def takemovefromsack(letterlist):
                     sack.pop(j)
                 break
         if not found:  # A zsákban nem lévő betűk (az ellenfél közös betűi)
-            print("letterlist",letterlist)
+            #print("letterlist",letterlist)
             eletter = Brick(",".join([letterlist[i], '1', letterlist[i + 1], letterlist[i + 2], '0']))
             letterbricks.append(eletter)
         i += 4
@@ -2361,24 +2354,19 @@ def countvowelsonrack():
 
 def drawletter(j):
     """Alapesetben kihúz egy véletlen betűt, ha az options.optimizeddraw = True, akkor amíg a szükséges számú betűt
-     tartalmazza a zsák, addig a magánhangzók+dzsókerek számát 40-60%-os arányban  tartja, illetve maximum 2
+     tartalmazza a zsák, addig a magánhangzók+dzsókerek számát kedvező arányban tartja, illetve maximum 2
      egyforma betű lehet egyidejűleg a tartón, ha van még elég betű a zsákban"""
     while 1:
         randomnumber = randrange(len(sack))
         if options.optimizeddraw:
             sackc, sackv = sortsack()
             numberofvowels, lrack = countvowelsonrack()
-
-            #print("mhg", "msg","arány", numberofvowels, lrack, numberofvowels / options.racksize )
             if (j+1) / options.racksize > 0.6:
                 if sack[randomnumber].type == 'C' and numberofvowels / options.racksize < 0.4 and len(sackv) > 0:
-                    #print("magánhangzót inkább")
                     continue
                 if sack[randomnumber].type == 'V' and numberofvowels / options.racksize > 0.6 and len(sackc) > 0:
-                    #print("mássalhangzót inkább")
                     continue
             if sack[randomnumber].letter in lrack and lrack[sack[randomnumber].letter] == 2:
-                #print("van már belőle kettő a tartón", sack[randomnumber].letter)
                 cou = 0
                 for bck in sack:
                     if bck.type == sack[randomnumber].type:
@@ -2423,7 +2411,6 @@ def close2():
 def changej(letter, sbrick):
     """Lerakott dzsókert a megfelelő betűre cseréli a táblán"""
     sbrick.changedletter = letter
-    # print("changed:", sbrick.changedletter)
     if options.valueofchangedletter:
         for i in sack1:
             if i.letter == letter:
@@ -2465,7 +2452,6 @@ def changeletter(sbrick):
 def changel(letter, sbrick):
     """Lerakott karaktert a megfelelő betűre cseréli a táblán"""
     sbrick.changedletter = letter
-    # print("changed:", sbrick.changedletter)
     sbrick.objectlist[1] = canvas1.create_text(sbrick.cx, sbrick.cy + 2,
                                                font=(options.letterfont, options.letterfontsize),
                                                text=sbrick.changedletter)
@@ -2552,13 +2538,12 @@ def checkboard():
     global checktime
     global timeractive
     contiguous = checkcontiguity()
-    print("contiguous",contiguous)
     if not contiguous:
         errormessage("A lerakott betűk között vannak, amelyek nem kapcsolódnak, vagy a szólánc nem halad át a "
                      "kezdőmezőn (ha ez be van állítva).\nKattints az OK gombra, majd jelöld ki a felesleges betűket.\n"
                      "Ha kész, kattints a Rendben gombra", appwin)
         chatboxmessage("Jelöld ki azokat a betűket a táblán, amelyek eltávolítása után csak kapcsolódó betűk maradnak "
-                       "a táblán, és a szólánc áthalad a kezdőmezőn (ha az be van állítva), majd kattints a Rendben "
+                       ", és a szólánc áthalad a kezdőmezőn (ha az be van állítva), majd kattints a Rendben "
                        "gombra.\n")
         timeractive = False
         checktime = True
@@ -2572,7 +2557,7 @@ def checkboard():
         errormessage(",".join(notvalid) + " nincs a szótárban.\nKattints az OK gombra, majd jelöld ki a felesleges "
                                           "betűket.\nHa kész, kattints a Rendben gombra", appwin)
         chatboxmessage(",".join(notvalid) + " nincs a szótárban\nJelöld ki azokat a betűket a táblán, amelyek "
-                                            "eltávolítása után a táblán csak érvényes szavak maradnak."
+                                            "eltávolítása után csak érvényes szavak maradnak."
                                             " Ha kész, kattints a Rendben gombra\n")
     else:
         checktime = False
@@ -2586,7 +2571,6 @@ def checkcontiguity():
     global contiguousletters
     onthestartfield = False
     boardtemp1 = copy.deepcopy(board)
-    print("boardoriginal",boardoriginal)
     found = False
     for i in range(fieldrc):
         for j in range(fieldcc):
@@ -2600,11 +2584,10 @@ def checkcontiguity():
     for i in range(fieldrc):
         for j in range(fieldcc):
             if not fields[i][j].ignored and fields[i][j].type != board[i][j] and boardtemp1[i][j] != "checked" and boardoriginal[i][j] != '?':
-                print("ii,jj",i,j,fields[i][j].type,board[i][j],boardtemp1[i][j])
                 if len(contiguousletters) > 0:
                     findneighbours()
-                    for sor in boardtemp1:
-                        print(sor)
+                    #for sor in boardtemp1:
+                    #    print(sor)
                 return False
     if options.startfield and not onthestartfield:
         return False
@@ -2634,7 +2617,6 @@ def validboard():
             if fields[i][j].type in options.fieldsdict or j == fieldcc-1 or fields[i][j].ignored:
                 if len(wordfields) > 1:
                     words.append(word)
-                    print("szó",word)
                     wordsfields.append(wordfields)
                 wordfields = []
                 word = ''
@@ -2653,7 +2635,6 @@ def validboard():
             if fields[i][j].type in options.fieldsdict or i == fieldrc - 1 or fields[i][j].ignored:
                 if len(wordfields) > 1:
                     words.append(word)
-                    print("szó",word)
                     wordsfields.append(wordfields)
                 wordfields = []
                 word = ''
@@ -2669,10 +2650,8 @@ def findneighbours():
     global boardoriginal
     global onthestartfield
     global contiguousletters
-    #print(contiguousletters)
     i = contiguousletters[0][0]
     j = contiguousletters[0][1]
-    #print("i,j",i,j)
     if options.startfield:
         if i == options.startfieldx and j == options.startfieldy:
             onthestartfield = True
@@ -2694,12 +2673,11 @@ def findneighbours():
             contiguousletters.append([i, j - 1])
     boardtemp1[i][j] = "checked"
     contiguousletters.pop(0)
-    #print("szomszédok", contiguousletters)
     if len(contiguousletters) > 0:
         findneighbours()
     else:
         pass
-        #print("boardtemp1",boardtemp1)
+
 
 def validmove(lob, direction):
     """Tovább vizsgálja a lépés érvényességét (folyamatosan vannak-e a betűk, minden irányban érvényes szót alkotnak-e,
@@ -2912,7 +2890,6 @@ def validmove(lob, direction):
         notcontinuous()
         return
     notvalid = findindictionary(wordsfields)
-    #print("wordsfields",wordsfields)
     if notvalid is None:
         return
     # Ha minden szó érvényes, vagy nem kell vizsgálni az érvényességet:
@@ -3017,7 +2994,6 @@ def endmove(lob):
             for i in range(fieldrc):
                 for j in range(fieldcc):
                    if lob[k].x == fieldstemp[i][j].x and lob[k].y == fieldstemp[i][j].y:
-                       #print("i,j",i,j)
                        assignvisiblefields(i,j)
     if options.duplicate:
         turnscore = 0
@@ -3034,7 +3010,7 @@ def printrack():
 
 
 def printboard():
-    print("")
+    #print("")
     sor = ""
     if not options.duplicate or options.gamemode == 1:
         canvas1.delete("newletter")
@@ -3091,7 +3067,6 @@ def findindictionary(wordsfields):
             if checkenchant:
                 found = spellcheck(word)
             else:
-                #print("word1l",word1l)
                 found = findinapartofdictionary(word1l)
             if not found:
                 notvalid.append(word)
@@ -3110,7 +3085,6 @@ def findindictionary(wordsfields):
 
 def findinapartofdictionary(word1l):
     """Lista formátumban megadott szó keresése a kezdőbetű+hossz által meghatározott részszótárban"""
-    # print("word1l", word1l)
     for w in partsofdictionary[word1l[0]+str(len(word1l))]:
         if w == tuple(word1l):
             return True
@@ -3839,7 +3813,7 @@ def setup1(sow):
     rb3 = Radiobutton(f0, state=sow1, disabledforeground="gray50", highlightthickness=0, borderwidth=0, pady=0,
                       text="Hálózaton játszom,", variable=v1, value=3, command=com21)
     rb3.grid(row=2, column=0, sticky=W)
-    # rb3.configure(state="disabled")
+    #rb3.configure(state="disabled")
 
     CreateToolTip(rb3, "Más játékosok elleni hálózatos játék beállítása")
 

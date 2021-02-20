@@ -90,7 +90,6 @@ class ThreadReception(threading.Thread):
                 for fl in options.fletters:
                     fl1 = fl.split(',')[:4]
                     ailettersonfrackl.append([fl1[0], fl1[2], '1', fl1[3]])
-                # print("frack", ailettersonfrackl)
             else:
                 ailettersonfrackl = []
         elif messagelist[0] == "BOARD":
@@ -122,7 +121,6 @@ class ThreadReception(threading.Thread):
                     ailettersonrackl.pop(i)
             for j in ailettersonrackl:
                 ailettersonrackls += j[0] + " "
-            # print("\n"+ailettersonrackls+"\n")
             self.connection.send("OK|".encode())
             starttime = time.time()
             aimove1(self.partsofdictionary)
@@ -334,7 +332,6 @@ def manageboard(move, caller):
     global fields
     global ailettersonrackl
     global firstmove
-    #print("ailettersonrackl", ailettersonrackl)
     direction = move[4]
     lob = move[5]
     if len(lob) > 0:
@@ -369,7 +366,6 @@ def manageboard(move, caller):
     b = 0
     if direction == "across":
         while k < len(lob):
-            # print("i,j", i, j)
             if board[i][j] in options.fieldsdict:
                 if lob[k][0] == '*' and not options.dontchangejoker:
                     board[i][j] = move[6][b]
@@ -387,7 +383,6 @@ def manageboard(move, caller):
         while k < len(lob):
             if board[i][j] in options.fieldsdict:
                 if lob[k][0] == '*' and not options.dontchangejoker:
-                    # print("move[6][b]", move[6][b])
                     board[i][j] = move[6][b]
                     fields[i][j] = Field(move[6][b], int(lob[k][1]), i, j)
                 else:
@@ -648,7 +643,7 @@ def aimove1(partsofdictionary):
         if len(validwords) > 0:
             allvalidword.extend(validwords)
         if int(time.time() - starttime) > options.aitimelimit - 10:
-            # print("Time1", numofletters, "betű")
+            # print("Time1")
             break
     if len(allvalidword) > 0:
         allvalidwordscores = aiscore(allvalidword)
@@ -694,7 +689,6 @@ def swapwithserver():
 def backtosack(lettersback):
     """Betűket rak vissza a zsákba, ha a beállítások igénylik"""
     global sack1
-    # print( lettersback)
     lettersback1 = lettersback[:]
     for brick in lettersback1:
         foundonfrack = False
@@ -1263,7 +1257,6 @@ def finishmove(selectedaimove):
     wordsinmove = "+".join(wordsfieldss)
     moveofai = "MOVE" + "," + wordsinmove + ";POS," + str(ii) + "," + str(jj) + ";DIR," + selectedaimove[4] \
                + ";SCORE," + str(selectedaimove[6]) + ";LOB" + letterlisttostr(lob1) + ";LOBCH," + lobch
-    #print("moveofai", moveofai)
     if int(time.time() - starttime) > options.aitimelimit - 2:
         # print("Time5")
         return

@@ -186,17 +186,12 @@ class Game:
             if self.options.optimizeddraw:
                 sackc, sackv = self.sortsack()
                 numberofvowels, lrack = self.countvowelsonrack(pla)
-
-                #print("mhg", "msg", "arány", numberofvowels, lrack, numberofvowels / self.options.racksize)
                 if (i + 1) / options.racksize > 0.6:
                     if self.sack[randomnumber][1] == 'C' and numberofvowels / self.options.racksize < 0.4 and len(sackv) > 0:
-                        print("magánhangzót inkább")
                         continue
                     if self.sack[randomnumber][1] == 'V' and numberofvowels / self.options.racksize > 0.6 and len(sackc) > 0:
-                        print("mássalhangzót inkább")
                         continue
                 if self.sack[randomnumber][0] in lrack and lrack[self.sack[randomnumber][0]] == 2:
-                    print("van már belőle kettő a tartón", self.sack[randomnumber][0])
                     cou = 0
                     for letter in self.sack:
                         if letter[1] == self.sack[randomnumber][1]:
