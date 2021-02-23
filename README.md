@@ -2,6 +2,7 @@
 
 ## Változások:
 - A szótár frissítése 2.2 verzióra.
+- Kezelési útmutató.
 - A tábla mezőihez 1-9 pontos jutalom rendelhető.
 - A kerülhetnek a táblára a játék indításakor kisorsolt betűk.
 - Nagyobb, "felfedezhető" táblák beláthatósága korlátozható.
