@@ -1,3 +1,8 @@
+
+ ![Alt text](manual/game8.gif)
+
+
+
 # CsiSza v0.3
 
 ## Változások:
